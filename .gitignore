@@ -1,2 +1,8 @@
+# Environments
 venv/
+
+# Jupyter Lab
+.ipynb_checkpoints
+
+# MAC artifacts
 .DS_Store
