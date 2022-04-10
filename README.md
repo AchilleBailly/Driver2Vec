@@ -1,7 +1,7 @@
 # Driver2Vec
 Reproduction of Driver2Vec paper. 
 
-Authors: [your name], Achille Bailly and Mingjia He 
+Authors: Danish Khan, Achille Bailly and Mingjia He 
 
 Original paper[1]: Yang, J., Zhao, R., Zhu, M., Hallac, D., Sodnik, J., & Leskovec, J. (2021). Driver2vec: Driver identification from automotive data. arXiv preprint arXiv:2102.05234.
 
