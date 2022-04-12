@@ -2,4 +2,5 @@ numpy
 pandas
 torch
 PyWavelets
+mkdocs
 mkdocs-windmill

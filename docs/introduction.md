@@ -6,22 +6,25 @@ Authors: Danish Khan, Achille Bailly and Mingjia He
 [//]: # (Original paper[1]: Yang, J., Zhao, R., Zhu, M., Hallac, D., Sodnik, J., & Leskovec, J. (2021). Driver2vec: Driver identification from automotive data. arXiv preprint arXiv:2102.05234.)
 
 ## Introduction
-The neural network architecture Driver2Vec is discussed and used to detect drivers from automotive data in this blogplot. Yang et al. published a paper in 2021 that explained and evaluated Driver2Vec, which outperformed other architectures at that time. Driver2Vec (is the first architecture that) blends temporal convolution with triplet loss using time series data [1]. With this embedding, it is possible to classify different driving styles. The purpose of this blog post is to give a full explanation of this architecture as well as to develop it from the ground up.
+The neural network architecture Driver2Vec is discussed and used to detect drivers from automotive data in this blogpost. Yang et al. published a paper in 2021 that explained and evaluated Driver2Vec, which outperformed other architectures at that time. Driver2Vec (is the first architecture that) blends temporal convolution with triplet loss using time series data [[1]](#1). With this embedding, it is possible to classify different driving styles. The purpose of this blog post is to give a full explanation of this architecture as well as to develop it from the ground up.
 
+Researchers employ sensors found in current automobiles to determine distinct driving patterns. In this manner, the efficacy is not dependent on invasive data, such as facial recognition or fingerprints. A system like this may detect who is driving the car and alter its vehicle settings accordingly. Furthermore, a system that recognizes driver types with high accuracy may be used to identify unfamiliar driving patterns, lowering the chance of theft.
 
 ## Method
+Driver2Vec transforms a 10-second clip of sensor data to an embedding that is being used to identify different driving styles [[1]](#1). This procedure can be broken down into two steps. In the first stage, a temporal convolutional network (TCN) and a Haar wavelet transform are utilized individually, then concatenated to generate a 62-length embedding. This embedding is intended such that drivers with similar driving styles are near to one another while drivers with different driving styles are further apart.
 
 ### Temporal Convolutional Network (TCN)
 Temporal Convolutional Networks (TCN) combines the architecture of convolutional networks and recurrent networks. 
 The principle of TCN consists of two aspects: 
-1) The output of TCN has the same length as the input. 
-2) TCN uses causal convolutions, where an output at a specific time step is only depend on the input from this time step and earlier in the previous layer.
+
+1. The output of TCN has the same length as the input. 
+2. TCN uses causal convolutions, where an output at a specific time step is only depend on the input from this time step and earlier in the previous layer.
 
 To ensure the first principle, zero padding is applied. As shown in Figure 1, the zero padding is applied on the left side of the input tensor and ensure causal convolution. In this case, the kernel size is 3 and the input length is 4. With a padding size of 2, the output length is equal to the input length. 
 
 <div align=center><img width="380" height="220" alt="zero padding" src="https://user-images.githubusercontent.com/101323945/161212963-e3fcf12a-edd9-4c15-9f1a-f37c42b28ab2.png"/></div>
 
-<p align="center">Figuer 1 zero padding[2]</p>
+<p align="center">Figure 1 zero padding[2]</p>
 
 One of the problems of casual convolution is that the history size it can cover is linear in the depth of network. Simple casual convolution could be challenging when dealing with sequential tasks that require a long history coverage, as very deep network would have many parameters, which may expand training time and lead to overfitting. Thus, dilated convolution is used to increase the receptive field size while having a small number of layers. Dilation is the name for the interval length between the elements in a layer used to compute one element of the next layer. The convolution with a dilation of one is a simple regular convolution. In TCN, dilation exponentially increases as progress through the layers. As shown in Figure 2, as the network moves deeper, the elements in the next layer cover larger range of elements in the previous layer.
 
@@ -46,25 +49,15 @@ The essence of Wavelet Transform is to how much of a wavelet is in a signal for 
 2) the coefficients of trend and fluctuation for at each time step is calculated use scalar product (in following equations);
 3) increase the wavelet scale and repeat the process.
 
+$$a_{m}=f \cdot W_{m}$$
 
-
-<div align=center>
-  
-  ![](https://latex.codecogs.com/svg.image?a_{m}=f\bullet&space;W_{m})
-  
-  ![](https://latex.codecogs.com/svg.image?d_{m}=f\bullet&space;V_{m})
-  
-</div>
+$$d_m = f \cdot V_m$$
 
 Most specifically, the Haar transform decomposes a discrete signal into two sub-signals of half its length, one is a running average or trend and the other is a running difference or fluctuation. As shown in the following equations, the first trend subsignal is computed from the average of two values and fluctuation, the second trend subsignal, is computed by taking a running difference, as shown in Equation 2. This structure enable transform to detect small fluctuations feature in signals. Figure 3 shows how Haar transform derives sub-signals for the signal f=(4, 6, 10, 12, 8, 6, 5, 5)
 
-<div align=center>
-  
-  ![](https://latex.codecogs.com/svg.image?a_{m}=\frac{f_{2m-1}&plus;f_{2m&plus;1}}{\sqrt{2}})
-  
-  ![](https://latex.codecogs.com/svg.image?a_{m}=\frac{f_{2m-1}-f_{2m&plus;1}}{\sqrt{2}})
-  
-</div>
+$$ a_m = \frac{f_{2m-1} + f_{2m+1}}{\sqrt{2}}$$
+
+$$ a_m = \frac{f_{2m-1} - f_{2m+1}}{\sqrt{2}}$$
 
 <div align=center><img width="550" height="260" alt="zero padding" src="https://user-images.githubusercontent.com/101323945/161373770-d9e80326-a68f-4522-9e99-5868b88a912d.png"/></div>
 
@@ -75,7 +68,7 @@ Most specifically, the Haar transform decomposes a discrete signal into two sub-
 ## Data
 ## Results
 ## Reference
-[1] Yang, J., Zhao, R., Zhu, M., Hallac, D., Sodnik, J., & Leskovec, J. (2021). Driver2vec: Driver identification from automotive data. arXiv preprint arXiv:2102.05234.
+<a id="1">[1]</a>  Yang, J., Zhao, R., Zhu, M., Hallac, D., Sodnik, J., & Leskovec, J. (2021). Driver2vec: Driver identification from automotive data. arXiv preprint arXiv:2102.05234.
 
 [2] Francesco, L. (2021). Temporal Convolutional Networks and Forecasting. https://unit8.com/resources/temporal-convolutional-networks-and-forecasting/
 

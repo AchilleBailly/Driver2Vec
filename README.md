@@ -4,7 +4,7 @@ Link to blog: https://achillebailly.github.io/Driver2Vec/
 
 Authors: Danish Khan, Achille Bailly and Mingjia He 
 
-[//]: # (Original paper[1]: Yang, J., Zhao, R., Zhu, M., Hallac, D., Sodnik, J., & Leskovec, J. (2021). Driver2vec: Driver identification from automotive data. arXiv preprint arXiv:2102.05234.)
+Original paper[1]: Yang, J., Zhao, R., Zhu, M., Hallac, D., Sodnik, J., & Leskovec, J. (2021). Driver2vec: Driver identification from automotive data. arXiv preprint arXiv:2102.05234.
 
 ## Introduction
 The neural network architecture Driver2Vec is discussed and used to detect drivers from automotive data in this blogplot. Yang et al. published a paper in 2021 that explained and evaluated Driver2Vec, which outperformed other architectures at that time. Driver2Vec (is the first architecture that) blends temporal convolution with triplet loss using time series data [1]. With this embedding, it is possible to classify different driving styles. The purpose of this blog post is to give a full explanation of this architecture as well as to develop it from the ground up.

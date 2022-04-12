@@ -1,7 +1,9 @@
-site_name: My Docs
+site_name: Driver2Vec
+repo_url: https://github.com/AchilleBailly/Driver2Vec
 
 theme:
-  name: windmill
+  name: null
+  custom_dir: "cinder"
 
 markdown_extensions:
   - pymdownx.arithmatex:
