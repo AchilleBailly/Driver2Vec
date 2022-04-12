@@ -2,5 +2,11 @@ numpy
 pandas
 torch
 PyWavelets
+tqdm
+ipywidgets
+
+jupyter
+jupyterlab
+
 mkdocs
 mkdocs-windmill

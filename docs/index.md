@@ -1,338 +1,81 @@
-<h1><i class="fas fa-fire" style="color:#FA023C"></i> Cinder Theme <small>for MkDocs</small></h1>
+# Driver2Vec
+Reproduction of Driver2Vec paper. 
 
-## About
+Authors: Danish Khan, Achille Bailly and Mingjia He 
 
-Cinder is a clean, responsive theme for static documentation sites that are generated with [MkDocs](https://github.com/mkdocs/mkdocs). It's built on the [Bootstrap 3 framework](https://getbootstrap.com/docs/3.3/) and includes pre-packaged:
+[//]: # (Original paper[1]: Yang, J., Zhao, R., Zhu, M., Hallac, D., Sodnik, J., & Leskovec, J. (2021). Driver2vec: Driver identification from automotive data. arXiv preprint arXiv:2102.05234.)
 
-<small><i class="fas fa-highlighter" style="color:#FA023C"></i> **[highlight.js v9.18.0](https://highlightjs.org/) syntax highlighting with support for [185 languages (over 30 by default) and over 90 styles](https://highlightjs.org/static/demo/)**</small></br>
-<small><i class="fab fa-font-awesome-alt" style="color:#FA023C"></i> **[FontAwesome v5.12.0](https://fortawesome.github.io/Font-Awesome/) icon support**</small></br>
-<small><i class="fas fa-font" style="color:#FA023C"></i> **[smashingly legible type scheme](./specimen#typography) to get your message out to your users**</small>
+## Introduction
+The neural network architecture Driver2Vec is discussed and used to detect drivers from automotive data in this blogpost. Yang et al. published a paper in 2021 that explained and evaluated Driver2Vec, which outperformed other architectures at that time. Driver2Vec (is the first architecture that) blends temporal convolution with triplet loss using time series data [[1]](#1). With this embedding, it is possible to classify different driving styles. The purpose of this blog post is to give a full explanation of this architecture as well as to develop it from the ground up.
 
-You are viewing the theme in action and can see a selection of the theme elements on the [Specimen page](./specimen/).
+Researchers employ sensors found in current automobiles to determine distinct driving patterns. In this manner, the efficacy is not dependent on invasive data, such as facial recognition or fingerprints. A system like this may detect who is driving the car and alter its vehicle settings accordingly. Furthermore, a system that recognizes driver types with high accuracy may be used to identify unfamiliar driving patterns, lowering the chance of theft.
 
-## Install
 
-**<em>Required</em>**: Python 3.4+
+# Method
+Driver2Vec transforms a 10-second clip of sensor data to an embedding that is being used to identify different driving styles [[1]](#1). This procedure can be broken down into two steps. In the first stage, a temporal convolutional network (TCN) and a Haar wavelet transform are utilized individually, then concatenated to generate a 62-length embedding. This embedding is intended such that drivers with similar driving styles are near to one another while drivers with different driving styles are further apart.
 
-### Install MkDocs & Create a New Project
+## Temporal Convolutional Network (TCN)
+Temporal Convolutional Networks (TCN) combines the architecture of convolutional networks and recurrent networks. 
+The principle of TCN consists of two aspects: 
 
-If you haven't installed MkDocs yet, use the following command to install it:
+1. The output of TCN has the same length as the input. 
+2. TCN uses causal convolutions, where an output at a specific time step is only depend on the input from this time step and earlier in the previous layer.
 
-<pre><code class="shell">$ pip install mkdocs</code></pre>
+To ensure the first principle, zero padding is applied. As shown in Figure 1, the zero padding is applied on the left side of the input tensor and ensure causal convolution. In this case, the kernel size is 3 and the input length is 4. With a padding size of 2, the output length is equal to the input length. 
 
-Next, navigate to a clean directory and create a new MkDocs project with the following command:
+<div style="text-align:center"><img src="https://user-images.githubusercontent.com/101323945/161212963-e3fcf12a-edd9-4c15-9f1a-f37c42b28ab2.png" /></div>
+<center>
+Figure 1. Zero padding [[2]](#2)
+</center>
 
-<pre><code class="shell">$ mkdocs new [projectname]</code></pre>
+One of the problems of casual convolution is that the history size it can cover is linear in the depth of network. Simple casual convolution could be challenging when dealing with sequential tasks that require a long history coverage, as very deep network would have many parameters, which may expand training time and lead to overfitting. Thus, dilated convolution is used to increase the receptive field size while having a small number of layers. Dilation is the name for the interval length between the elements in a layer used to compute one element of the next layer. The convolution with a dilation of one is a simple regular convolution. In TCN, dilation exponentially increases as progress through the layers. As shown in Figure 2, as the network moves deeper, the elements in the next layer cover larger range of elements in the previous layer.
 
-Replace `[projectname]` with the name of your project (without the brackets).
+<div style="text-align:center"><img src="https://user-images.githubusercontent.com/101323945/161215806-812c7e4f-661e-49a6-b189-e8ad72517d3c.png" /></div>
+<center>
+Figure 2. An example of dilated causal convolution [[3]](#3)
+</center>
 
-Then navigate to the root of your project directory:
+TCN employs generic residual module in place of a convolutional layer. The structure of residual connection is shown in Figure 3, in each residual block, TCN has two layers including dilated causal convolution, weight normalization, rectified linear unit (ReLU) and dropout. 
 
-<pre><code class="shell">$ cd [projectname]</code></pre>
+<div style="text-align:center"><img src="https://user-images.githubusercontent.com/101323945/161216087-b0570b3b-dcf5-4b4b-87ef-6c2ea2abfc77.png" /></div>
+<center>
+Figure 3. The residual module in TCN [[3]](#3)
+</center>
 
-### Install the Cinder Theme
+## Haar Wavelet Transform 
 
-Download the Cinder theme archive by clicking the button below.
+Driver2vec applied Haar wavelet transformation to generates two vectors in the frequency domain. Wavelet Transform decomposes a time series function into a set of wavelets. A Wavelet is an oscillation use to decompose the signal, which has two characteristics, scale and location. Large scale can capture low frequency information and conversely, small scale is designed for high frequency information. Location defines the time and space of the wavelet. 
 
-<a href="https://github.com/chrissimpkins/cinder/archive/v1.2.0.zip"><button type="button" class="btn btn-success"><i class="fas fa-cloud-download-alt fa-3x"></i> </br>  <span style="font-size:20px;">Download Cinder</span></button></a>
+The essence of Wavelet Transform is to how much of a wavelet is in a signal for a particular scale and location. The process of Wavelet Transform consists of four steps: 
 
-Unpack the contents of the archive into a directory named `cinder` at the top level of your MkDocs project directory.
+1) the wavelet moves across the entire signal with various location;
+2) the coefficients of trend and fluctuation for at each time step is calculated use scalar product (in following equations);
+3) increase the wavelet scale and repeat the process.
 
-Your project directory should now look like this:
+$$a_{m}=f \cdot W_{m}$$
 
-<pre><code class="shell">.
-├── mkdocs.yml
-├── cinder
-│     ├── css
-│     ├── img
-│     ├── js
-│     ├── base.html
-│     ├── content.html
-│     ├── 404.html
-│     ├── nav-sub.html
-│     ├── nav.html
-│     └── toc.html
-└── docs
-      └── index.md
-</code></pre>
+$$d_m = f \cdot V_m$$
 
-MkDocs projects use a YAML settings file called `mkdocs.yml`.  This is located in the root of your project directory after you use the `mkdocs new` command.  Open the file in a text editor and modify it to include the `theme` settings as follows:
+Most specifically, the Haar transform decomposes a discrete signal into two sub-signals of half its length, one is a running average or trend and the other is a running difference or fluctuation. As shown in the following equations, the first trend subsignal is computed from the average of two values and fluctuation, the second trend subsignal, is computed by taking a running difference, as shown in Equation 2. This structure enable transform to detect small fluctuations feature in signals. Figure 3 shows how Haar transform derives sub-signals for the signal f=(4, 6, 10, 12, 8, 6, 5, 5)
 
-<pre><code class="yaml">site_name: [YOURPROJECT]
-theme:
-  name: null
-  custom_dir: 'cinder'
-nav:
-  - Home: index.md</code></pre>
+$$ a_m = \frac{f_{2m-1} + f_{2m+1}}{\sqrt{2}}$$
 
-See the [MkDocs documentation](https://www.mkdocs.org/user-guide/custom-themes/#creating-a-custom-theme) for additional details.
+$$ a_m = \frac{f_{2m-1} - f_{2m+1}}{\sqrt{2}}$$
 
-<div class="bs-callout bs-callout-default">
-  <h4>Updates, the Manual Approach</h4>
-  If you choose the manual install approach, you can update your Cinder theme by downloading the new cinder.zip release archive and including it in your project. Then re-build your static site files (see instructions below).
-</div>
+<div style="text-align:center"><img width="550" src="https://user-images.githubusercontent.com/101323945/161373770-d9e80326-a68f-4522-9e99-5868b88a912d.png" /></div>
+<center>
+Figure 4. An example for Haar transform [[4]](#4)
+</center>
 
-## Test with a Local Site Server
+## Gradient Boosting Decision Trees (LightGBM)
 
-Use the following command to establish a local server for your site:
+# Data
+# Results
+# Reference
+<a id="1">[1]</a>  Yang, J., Zhao, R., Zhu, M., Hallac, D., Sodnik, J., & Leskovec, J. (2021). Driver2vec: Driver identification from automotive data. arXiv preprint arXiv:2102.05234.
 
-<pre><code class="shell">$ mkdocs serve</code></pre>
+<a id="2">[2]</a> Francesco, L. (2021). Temporal Convolutional Networks and Forecasting. https://unit8.com/resources/temporal-convolutional-networks-and-forecasting/
 
-Then open your site in any browser at the URL `http://localhost:8000`.
+<a id="3">[3]</a> Bai, S., Kolter, J. Z., & Koltun, V. (2018). An empirical evaluation of generic convolutional and recurrent networks for sequence modeling. arXiv preprint arXiv:1803.01271.
 
-## Create Your Site
-
-### Add Content with Markdown Syntax
-
-Get to work on your site home page by opening the `docs/index.md` file and editing it in Markdown syntax.  The HTML automatically updates in the browser when you save the Markdown file if you use the MkDocs server (see command above).
-
-### Add New Pages
-
-Add new pages to your site by creating a new Markdown file in your `docs` directory, then linking to the new page in the `mkdocs.yml` file.  This uses a `Page Name : Markdown file` syntax.
-
-For example, to add an About page using a Markdown file that is located on the path `docs/about.md`, you would format the `mkdocs.yml` file as follows:
-
-<pre><code class="yaml">site_name: [YOURPROJECT]
-theme:
-  name: null
-  custom_dir: 'cinder'
-nav:
-  - Home: index.md
-  - About: about.md</code></pre>
-
-Add additional pages to your site by repeating the above series of steps.
-
-## Build Your Site
-
-Build your site files with the command:
-
-<pre><code class="shell">$ mkdocs build</code></pre>
-
-Your site files are built in the `site` directory and are ready to use.  Deploy the contents of the `site` directory to your web server.
-
-## Important Configuration Issues
-
-<div class="bs-callout bs-callout-warning">
-  <h4><i class="fas fa-exclamation-triangle"></i> Please review these issues before you push your site into a production setting!</h4>
-</div>
-
-### 1. Set the `site_url` configuration field
-You must set the `site_url` field in your `mkdocs.yml` file to the appropriate production URL in order to generate a valid `sitemap.xml` file ([issue #80](https://github.com/chrissimpkins/cinder/issues/80)).
-
-Here is an example from the [Cinder project `mkdocs.yml` file](https://github.com/chrissimpkins/cinder/blob/master/mkdocs.yml):
-
-```yml
-site_name: Cinder
-site_url: https://sourcefoundry.org/cinder/
-site_author: Christopher Simpkins
-site_description: "A clean, responsive theme for static documentation websites that are generated with MkDocs"
-repo_url: "https://github.com/chrissimpkins/cinder"
-copyright: "Cinder is licensed under the <a href='https://github.com/chrissimpkins/cinder/blob/master/LICENSE.md'>MIT license</a>"
-
-theme:
-  name: null
-  custom_dir: cinder
-  colorscheme: github
-  highlightjs: true
-  hljs_languages:
-    - yaml
-
-nav:
-  - Home: index.md
-  - Specimen: specimen.md
-
-markdown_extensions:
-  - admonition
-```
-
-The `sitemap.xml` file will be located at `[SITE_URL]/sitemap.xml` when you push your site into the production environment.  During development the `sitemap.xml` file can be found at `http://127.0.0.1:8000/sitemap.xml`.
-
-## Site Customization
-
-The following are a few common customizations that you might be interested in.  For much more detail about the configuration of your site, check out the [MkDocs Configuration documentation](https://github.com/mkdocs/mkdocs/blob/master/docs/user-guide/configuration.md).
-
-### Syntax Highlighting Color Scheme
-
-Cinder supports the [90+ highlightjs color schemes](https://highlightjs.org/static/demo/).  The `github` color scheme that you see on this page is the default and will be used if you do not specify otherwise.
-
-To change to a different scheme, include the `colorscheme` field under the `theme` field in your `mkdocs.yml` file and enter the color scheme name.  For example, to switch to the [Dracula theme](https://draculatheme.com/), enter the following:
-
-```yml
-theme:
-  name: null
-  custom_dir: cinder
-  colorscheme: dracula
-
-```
-
-and then rebuild your site.
-
-The color scheme name should match the base name of the highlightjs CSS file.  See the [`src/styles` directory of the highlightjs repository](https://github.com/highlightjs/highlight.js/tree/master/src/styles) for a complete list of these CSS paths.
-
-### Syntax Highlighting Language Support
-
-By default, Cinder supports the ~30 syntaxes listed under `common` in [the documentation](https://highlightjs.org/static/demo/).  You can broaden support to any of the over 130 highlightjs languages using definitions in your `mkdocs.yml` file.
-
-To add a new language, create a list of additional languages as a `hljs_languages` sub-field under the `theme` field in the `mkdocs.yml` file.  The definitions are formatted as a newline-delimited list with `-` characters.
-
-For example, to add support for the Julia and Perl languages, format your configuration file like this:
-
-```yml
-theme:
-  name: null
-  custom_dir: cinder
-  hljs_languages:
-      - julia
-      - perl
-```
-
-Use the base file name of the [JavaScript files located in the CDN](https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@9.18.0/build/languages/) for your syntax definitions.
-
-### Site Favicon
-
-Create an `img` subdirectory in your `docs` directory and add a custom favicon.ico file.  See the [MkDocs documentation](https://www.mkdocs.org/#changing-the-favicon-icon) for additional details.
-
-### Add Your Own CSS Stylesheets
-
-Create a `css` directory inside your `docs` directory and add your CSS files.  You can overwrite any of the Cinder styles in your CSS files.  Then include your CSS files in the `mkdocs.yml` file with the `extra_css` field:
-
-<pre><code class="yaml">site_name: [YOURPROJECT]
-theme: cinder
-extra_css:
-  - "css/mystyle.css"
-  - "css/myotherstyle.css"
-nav:
-  - Home: index.md
-  - About: about.md</code></pre>
-
-Your CSS styles fall at the end of the cascade and will override all styles included in the theme (including Bootstrap and default Cinder styles).  You can find the Cinder and Bootstrap CSS files on the paths `cinder/css/cinder.css` and `cinder/css/bootstrap.min.css`, respectively.
-
-
-### Add Your Own JavaScript
-
-Create a `js` directory inside your `docs` directory and add your JS files.  Then include your JS files in the `mkdocs.yml` file with the `extra_js` field:
-
-<pre><code class="yaml">site_name: [YOURPROJECT]
-theme: cinder
-extra_js:
-  - "js/myscript.js"
-  - "js/myotherscript.js"
-nav:
-  - Home: index.md
-  - About: about.md</code></pre>
-
-### Keyboard shortcuts
-
-Place the following in your `mkdocs.yml` file to enable keyboard shortcuts:
-
-```shell
-shortcuts:
-    help: 191    # ?
-    next: 39     # right arrow
-    previous: 37 # left arrow
-    search: 83   # s
-```
-
-The numbers correspond to the key that you would like to use for that shortcut. You can use [https://keycode.info/](https://keycode.info/) to find the keycode you want.
-
-### Extending Cinder
-
-Create a new directory within your project (e.g., `cinder-theme-ext/`) and create `main.html`. Add the following line at the top of the HTML file.
-
-```html
-{% extends "base.html" %}
-```
-
-Instead of using `theme_dir: cinder` in `mkdocs.yml`, use:
-
-<pre><code class="yaml">theme:
-    name: cinder
-    custom_dir: [custom dir]</code></pre>
-
-Refer to [MkDocs Documentation - Using the theme custom_dir](https://www.mkdocs.org/user-guide/styling-your-docs/#using-the-theme-custom_dir) for more information.
-
-Use the following examples as reference. You can put your own [Jinja2](http://jinja.pocoo.org/) within the blocks. More information can be found in [MkDocs Documentation - Overriding Template Blocks](https://www.mkdocs.org/user-guide/styling-your-docs/#overriding-template-blocks).
-
-#### Adding extra HTML to the head tag
-
-Append to `main.html`:
-
-```html
-{% block extrahead %}
-      <meta name="author" content="{{ page.meta.author }}">
-{% endblock %}
-```
-
-#### Replacing footer
-
-Append to `main.html`:
-
-```html
-{% block footer %}
-<hr>
-<p>{% if config.copyright %}
-      <small>{{ config.copyright }}<br></small>
-{% endif %}
-<small>Documentation built with <a href="http://www.mkdocs.org/">MkDocs</a>.</small>
-{% if page.meta.revision_date %}
-      <small><br><i>Updated {{ page.meta.revision_date }}</i></small>
-{% endif %}
-</p>
-{% endblock %}
-```
-
-`page.meta.revision_date` can be set by using [meta-data (front-matter)](https://www.mkdocs.org/user-guide/writing-your-docs/#meta-data) at the beginning of your Markdown document or using [mkdocs-git-revision-date-plugin](https://github.com/zhaoterryy/mkdocs-git-revision-date-plugin).
-
-### Github or Bitbucket Repository Link
-
-Include the `repo_url` field and define it with your repository URL:
-
-<pre><code class="yaml">site_name: [YOURPROJECT]
-theme: cinder
-repo_url: "https://github.com/chrissimpkins/cinder"
-nav:
-  - Home: index.md
-  - About: about.md</code></pre>
-
-The link appears at the upper right hand corner of your site.
-
-### License Declaration and Link
-
-The Cinder theme displays your license declaration in the footer if you include a `copyright` field and define it with the text (and optionally the HTML link) that you would like to display:
-
-<pre><code class="yaml">site_name: [YOURPROJECT]
-theme: cinder
-copyright: "Cinder is licensed under the &lt;a href='https://github.com/chrissimpkins/cinder/blob/master/LICENSE.md'&gt;MIT license</a>"
-nav:
-  - Home: index.md
-  - About: about.md</code></pre>
-
-### Disabling Theme Features
-
-The Cinder theme can turn off some theme features entirely in `mkdocs.yml`, for situations where you don't need these features. If this is all the customization required, it saves overriding theme files. For example:
-
-```yml
-theme:
-  name: cinder
-  # Turn off Previous/Next navigation links in the navbar
-  disable_nav_previous_next: true
-  # Turn off Search in the navbar
-  disable_nav_search: true
-  # Turn off the site_name link in the navbar
-  disable_nav_site_name: true
-  # Turn off the footer entirely
-  disable_footer: true
-  # Turn off the default footer message, but display the page revision date if it's available
-  disable_footer_except_revision: true
-```
-
-## Issues
-
-If you have any issues with the theme, please report them on the Cinder repository:
-
-<a href="https://github.com/chrissimpkins/cinder/issues/new"><button class="btn btn-primary btn-lg" type="submit"><i class="fab fa-github fa-2x"></i> Report Issue</button></a>
-<a href="https://github.com/chrissimpkins/cinder/issues"><button class="btn btn-primary btn-lg" type="submit"> Active Issues <i class="fab fa-github fa-2x"></i></button></a>
-
-## License
-
-Cinder is licensed under the [MIT license](https://github.com/chrissimpkins/cinder/blob/master/LICENSE.md).
+<a id="4">[4]</a> Haar Wavelets http://dsp-book.narod.ru/PWSA/8276_01.pdf
