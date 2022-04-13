@@ -7,6 +7,7 @@ theme:
   custom_dir: "cinder"
 
 markdown_extensions:
+  - tables
   - pymdownx.arithmatex:
       generic: true
 
