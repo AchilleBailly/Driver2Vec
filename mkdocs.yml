@@ -1,6 +1,8 @@
 site_name: Driver2Vec
 site_url: https://achillebailly.github.io/Driver2Vec/
-repo_url: https://github.com/AchilleBailly/Driver2Vec
+repo_url: https://github.com/AchilleBailly/Driver2Vec/
+
+edit_uri: ""
 
 theme:
   name: null
