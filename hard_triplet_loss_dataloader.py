@@ -672,5 +672,6 @@ if __name__ == "__main__":
             pbar.set_description("Loss: %0.5g, Epochs" % (np.mean(loss_list)))
 
         acc = get_n_way_accuracy(2, test_set, training_set, model)
+        print(acc)
         out_file.write(f"Group dropped: {group_to_drop}; Accuracy: {acc}\n")
     out_file.close()

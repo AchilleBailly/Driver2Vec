@@ -1,4 +1,5 @@
 COLUMN_GROUPS = {
+    "base": [],
     "acceleration": ["ACCELERATION",
                      "ACCELERATION_PEDAL",
                      "ACCELERATION_Y",
@@ -28,7 +29,7 @@ COLUMN_GROUPS = {
     "gearbox": ["GEARBOX"]
 }
 
-COLUMN_SELECTION_SPECS = ["acceleration", "speed", "distance", "pedal",
+COLUMN_SELECTION_SPECS = ["base", "acceleration", "speed", "distance", "pedal",
                           "lane", "rainsnow", "angle",
                           "indicator", "headlight", "horn", "gearbox"]
 
