@@ -4,10 +4,10 @@ Link to blog: https://achillebailly.github.io/Driver2Vec/
 
 Authors: Danish Khan, Achille Bailly and Mingjia He 
 
-Original paper[^1]: Yang, J., Zhao, R., Zhu, M., Hallac, D., Sodnik, J., & Leskovec, J. (2021). Driver2vec: Driver identification from automotive data. arXiv preprint arXiv:2102.05234.
+Original paper[1]: Yang, J., Zhao, R., Zhu, M., Hallac, D., Sodnik, J., & Leskovec, J. (2021). Driver2vec: Driver identification from automotive data. arXiv preprint arXiv:2102.05234.
 
 ## Introduction
-The neural network architecture Driver2Vec is discussed and used to detect drivers from automotive data in this blogplot. Yang et al. published a paper in 2021 that explained and evaluated Driver2Vec, which outperformed other architectures at that time. Driver2Vec (is the first architecture that) blends temporal convolution with triplet loss using time series data [^1]. With this embedding, it is possible to classify different driving styles. The purpose of this blog post is to give a full explanation of this architecture as well as to develop it from the ground up.
+The neural network architecture Driver2Vec is discussed and used to detect drivers from automotive data in this blogplot. Yang et al. published a paper in 2021 that explained and evaluated Driver2Vec, which outperformed other architectures at that time. Driver2Vec (is the first architecture that) blends temporal convolution with triplet loss using time series data [1]. With this embedding, it is possible to classify different driving styles. The purpose of this blog post is to give a full explanation of this architecture as well as to develop it from the ground up.
 
 ## Method
 
@@ -27,13 +27,13 @@ One of the problems of casual convolution is that the history size it can cover 
 
 <div align=center><img width="350" height="240" alt="zero padding" src="https://user-images.githubusercontent.com/101323945/161215806-812c7e4f-661e-49a6-b189-e8ad72517d3c.png"/></div>
 
-<p align="center">Figure 2 An example of dilated causal convolution[^3]</p>
+<p align="center">Figure 2 An example of dilated causal convolution[3]</p>
 
 TCN employs generic residual module in place of a convolutional layer. The structure of residual connection is shown in Figure 3, in each residual block, TCN has two layers including dilated causal convolution, weight normalization, rectified linear unit (ReLU) and dropout. 
 
 <div align=center><img width="580" height="280" alt="zero padding" src="https://user-images.githubusercontent.com/101323945/161216087-b0570b3b-dcf5-4b4b-87ef-6c2ea2abfc77.png"/></div>
 
-<p align="center">Figure 3 The residual module in TCN[^3]</p>
+<p align="center">Figure 3 The residual module in TCN[3]</p>
 
 
 ### Haar Wavelet Transform 
@@ -68,7 +68,7 @@ Most specifically, the Haar transform decomposes a discrete signal into two sub-
 
 <div align=center><img width="550" height="260" alt="zero padding" src="https://user-images.githubusercontent.com/101323945/161373770-d9e80326-a68f-4522-9e99-5868b88a912d.png"/></div>
 
-<p align="center">Figure 4 An exampel for Haar transform[^4]</p>
+<p align="center">Figure 4 An exampel for Haar transform[4]</p>
 
 ### Triplet Margin Loss
 
@@ -82,19 +82,19 @@ Once the output of the wavelet transform and the TCN are combined throught a Ful
 
 Where ![](https://latex.codecogs.com/svg.image?x_{r,p,n}) are the embeddings for the anchor, positive and negative samples respectively, ![](https://latex.codecogs.com/svg.image?D_{rp}) (resp. ![](https://latex.codecogs.com/svg.image?D_{rn})) is the distance (usually euclidian) between the anchor and the positive embdeggings (resp. negative) and the margin is a positive number.
 
-With the available dataset being so limited, choosing the positive and negative samples for each anchor at random is probably enough. In most cases however, the most efficient way of choosing them is to pick the worst ones for each anchor (see [here]([^tripletloss_website])), i.e. chossing the positive sample that is the farthest away and the negative one that is the closest. Again, for more detail on how to actually do that efficiently, go to [this website]([^tripletloss_website]) for a very detailed explanation.
+With the available dataset being so limited, choosing the positive and negative samples for each anchor at random is probably enough. In most cases however, the most efficient way of choosing them is to pick the worst ones for each anchor (see [4]), i.e. chossing the positive sample that is the farthest away and the negative one that is the closest. Again, for more detail on how to actually do that efficiently, go to the website referenced in [4] for a very detailed explanation.
 
 ### Gradient Boosting Decision Trees (LightGBM)
 
 ## Data
 ## Results
 ## References
-[^1]: Yang, J., Zhao, R., Zhu, M., Hallac, D., Sodnik, J., & Leskovec, J. (2021). Driver2vec: Driver identification from automotive data. arXiv preprint arXiv:2102.05234.
+[1]: Yang, J., Zhao, R., Zhu, M., Hallac, D., Sodnik, J., & Leskovec, J. (2021). Driver2vec: Driver identification from automotive data. arXiv preprint arXiv:2102.05234.
 
-[^2]: Francesco, L. (2021). Temporal Convolutional Networks and Forecasting. https://unit8.com/resources/temporal-convolutional-networks-and-forecasting/
+[2]: Francesco, L. (2021). Temporal Convolutional Networks and Forecasting. https://unit8.com/resources/temporal-convolutional-networks-and-forecasting/
 
-[^3]: Bai, S., Kolter, J. Z., & Koltun, V. (2018). An empirical evaluation of generic convolutional and recurrent networks for sequence modeling. arXiv preprint arXiv:1803.01271.
+[3]: Bai, S., Kolter, J. Z., & Koltun, V. (2018). An empirical evaluation of generic convolutional and recurrent networks for sequence modeling. arXiv preprint arXiv:1803.01271.
 
-[^tripletloss_website]: Good explanation and implementation (in Tensorflow) of the Triplet Loss: https://omoindrot.github.io/triplet-loss
+[4]: Good explanation and implementation (in Tensorflow) of the Triplet Loss: https://omoindrot.github.io/triplet-loss
 
-[^4]: Haar Wavelets http://dsp-book.narod.ru/PWSA/8276_01.pdf
+[5]: Haar Wavelets http://dsp-book.narod.ru/PWSA/8276_01.pdf
