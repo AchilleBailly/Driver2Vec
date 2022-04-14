@@ -1,5 +1,4 @@
 # %%
-from operator import index
 import matplotlib.pyplot as plt
 from tsne_torch import TorchTSNE as TSNE
 import lightgbm as lgbm
@@ -13,9 +12,8 @@ from torch.nn.utils import weight_norm
 from torch.utils.data import DataLoader
 from tqdm.notebook import tqdm
 import itertools as itt
+from scenarios import *
 
-
-from haar_part_other_group import HaarWavelet
 
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda:0" if use_cuda else "cpu")
@@ -90,10 +88,10 @@ class TemporalBlock(nn.Module):
         self.init_weights()
 
     def init_weights(self):
-        nn.init.xavier_uniform(self.conv1.weight)
-        nn.init.xavier_uniform(self.conv2.weight)
+        nn.init.xavier_uniform_(self.conv1.weight)
+        nn.init.xavier_uniform_(self.conv2.weight)
         if self.downsample is not None:
-            nn.init.xavier_uniform(self.downsample.weight)
+            nn.init.xavier_uniform_(self.downsample.weight)
 
     def forward(self, x):
         out = self.net(x)
@@ -352,7 +350,7 @@ class HardTripletLoss():
 # %%
 
 
-def preprocess(df):
+def preprocess(df, to_drop):
     return (
         df.drop(
             ["FOG",
@@ -362,7 +360,7 @@ def preprocess(df):
              "RAIN",
              "REAR_WIPERS",
              "SNOW",
-             ], axis=1
+             ] + to_drop, axis=1
         )
     )
 
@@ -419,23 +417,24 @@ class FromFiles:
     Also segments the 1000-length inputs as suggested in the original paper
     """
 
-    def __init__(self, input_dir, input_length, seg_offset=40):
+    def __init__(self, input_dir, input_length, columns_to_drop, seg_offset=40):
         self.input_length = input_length
         self.seg_offset = seg_offset
 
-        self.raw_data, self.raw_labels = self._load_dataset(input_dir)
+        self.raw_data, self.raw_labels = self._load_dataset(
+            input_dir, columns_to_drop)
         self.seg_data, self.seg_labels = self._segment(
             input_length, seg_offset)
         self.index = [i for i in range(len(self.seg_data))]
 
-    def _load_dataset(self, input_dir):
+    def _load_dataset(self, input_dir, columns_to_drop):
         x = []
         y = []
         for dir, _, files in os.walk(input_dir):
             for file in files:
                 label = int(file.split("_")[1])-1
                 df = pd.read_csv(dir + "/" + file, index_col=0)
-                df = preprocess(df).to_numpy().transpose()
+                df = preprocess(df, columns_to_drop).to_numpy().transpose()
                 x.append(torch.from_numpy(df).float()+1e-8)
                 y.append(label)
         return x, y
@@ -532,61 +531,12 @@ class Dataloader():
 
 
 # %%
-input_channels = 31
-input_length = 300
-channel_sizes = [25, 32]
-output_size = 62
-kernel_size = 16
-dropout = 0.1
-model = Driver2Vec(input_channels, input_length, channel_sizes, output_size,
-                   kernel_size=kernel_size, dropout=dropout, do_wavelet=True)
-model.to(device)
+def get_model(input_channels):
+    model = Driver2Vec(input_channels, INPUT_LENGTH, CHANNELS_SIZES, OUTPUT_SIZE,
+                       kernel_size=KERNEL_SIZE, dropout=DROPOUT, do_wavelet=True)
+    model.to(device)
+    return model
 
-# %% [markdown]
-
-# Next are the dataloader, loss and optimizer.
-
-# %%
-
-# # datasets parameters
-# params = {'batch_size': 4,
-#           'shuffle': True,
-#           'num_workers': 1}
-
-
-fromfiles = FromFiles("./dataset", input_length)
-x_train, y_train, x_test, y_text = fromfiles.split_train_test()
-training_set = Dataset(x_train, y_train, input_length)
-training_generator = Dataloader(training_set, 30)
-
-loss = HardTripletLoss(device, margin=1)
-optimizer = torch.optim.Adam(model.parameters(), lr=0.0008, weight_decay=0.0)
-
-# %% [markdown]
-
-# Finally, here is the training loop.
-# %%
-epochs = 20
-
-
-model.train()
-for epoch in (pbar := tqdm(range(epochs))):
-    loss_list = []
-    for anchor, label in training_generator:
-        anchor = anchor.to(device)
-
-        optimizer.zero_grad()
-
-        y_anchor = model(anchor)
-
-        loss_value = loss(y_anchor, label)
-        loss_value.backward()
-
-        optimizer.step()
-
-        loss_list.append(loss_value.cpu().detach().numpy())
-    #print("Epoch: {}/{} - Loss: {:.4f}".format(epoch+1, epochs, np.mean(loss_list)))
-    pbar.set_description("Loss: %0.5g, Epochs" % (np.mean(loss_list)))
 
 # %% [markdown]
 
@@ -608,7 +558,8 @@ def get_n_way_accuracy(n_way, test_dataset, train_dataset, model):
         'max_depth': 8,
         'num_trees': 30,
         'verbose': 0,
-        'min_data_in_leaf': 2  # May need to change that with a real test set
+        'min_data_in_leaf': 2,  # May need to change that with a real test set
+        'verbose': -1
     }
 
     model.eval()
@@ -622,7 +573,8 @@ def get_n_way_accuracy(n_way, test_dataset, train_dataset, model):
                                                                                    model)
         x_test_class, y_test_class = test_dataset.get_classifier_data(
             driver_list, model)
-        lgb_train = lgbm.Dataset(x_train_classifier, y_train_classifier)
+        lgb_train = lgbm.Dataset(x_train_classifier, y_train_classifier, params={
+                                 'verbose': -1}, free_raw_data=False)
 
         clf = lgbm.train(params, lgb_train)
 
@@ -631,13 +583,9 @@ def get_n_way_accuracy(n_way, test_dataset, train_dataset, model):
         binar_pred = [0 if pred[index][truth] <
                       0.5 else 1 for index, truth in enumerate(y_test_class)]
         accuracies.append(np.mean(binar_pred))
-    
+
     return np.mean(accuracies)
 
-
-test_dataset = Dataset(x_test, y_text, input_length)
-train_dataset = Dataset(x_train, y_train, input_length)
-get_n_way_accuracy(2, test_dataset, train_dataset, model)
 
 # %% [markdown]
 
@@ -661,33 +609,69 @@ def distance_matrix(tensor: torch.Tensor):
 
 # As in the original paper, we us t-SNE to visualise the embeddings. It can help to spot the issues in the model.
 # %%
-params = {'batch_size': 60,
-          'shuffle': True,
-          'number_batch': 1}
+def show_TSNE(model, training_set):
+    params = {'batch_size': 60,
+              'shuffle': True,
+              'number_batch': 1}
 
-generator = Dataloader(training_set, **params)
-x_tsne = []
-y_tsne = []
-for data, label in generator:
-    data = data.to(device)
-    embed = model(data)
+    generator = Dataloader(training_set, **params)
+    x_tsne = []
+    y_tsne = []
+    for data, label in generator:
+        data = data.to(device)
+        embed = model(data)
 
-print(embed.shape)
+    print(embed.shape)
 
-for i in range(embed.shape[0]):
-    x_tsne.append(embed[i, :].cpu().detach().numpy().squeeze())
-    y_tsne.append(int(label[i]))
+    for i in range(embed.shape[0]):
+        x_tsne.append(embed[i, :].cpu().detach().numpy().squeeze())
+        y_tsne.append(int(label[i]))
 
+    X_emb = TSNE(n_components=2, perplexity=60, n_iter=10000,
+                 verbose=True).fit_transform(embed)
 
-# %%
-
-X_emb = TSNE(n_components=2, perplexity=60, n_iter=10000,
-             verbose=True).fit_transform(embed)
-
-
-# %%
-
-plt.scatter(X_emb[:, 0], X_emb[:, 1], marker="+", c=y_tsne)
-plt.show()
+    plt.scatter(X_emb[:, 0], X_emb[:, 1], marker="+", c=y_tsne)
+    plt.show()
 
 # %%
+
+
+if __name__ == "__main__":
+    out_file = open("out_files.txt", "wt")
+    for group_to_drop in COLUMN_SELECTION_SPECS:
+
+        to_drop = COLUMN_GROUPS[group_to_drop]
+
+        fromfiles = FromFiles("./dataset", INPUT_LENGTH, to_drop)
+        x_train, y_train, x_test, y_text = fromfiles.split_train_test()
+        training_set = Dataset(x_train, y_train, INPUT_LENGTH)
+        test_set = Dataset(x_test, y_text, INPUT_LENGTH)
+        training_generator = Dataloader(training_set, BATCH_SIZE)
+
+        model = get_model(x_train[0].shape[0])
+        loss = HardTripletLoss(device, margin=1)
+        optimizer = torch.optim.Adam(
+            model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
+
+        for epoch in (pbar := tqdm(range(EPOCHS))):
+            loss_list = []
+            for anchor, label in training_generator:
+                anchor = anchor.to(device)
+
+                optimizer.zero_grad()
+
+                y_anchor = model(anchor)
+
+                loss_value = loss(y_anchor, label)
+                loss_value.backward()
+
+                optimizer.step()
+
+                loss_list.append(loss_value.cpu().detach().numpy())
+            #print("Epoch: {}/{} - Loss: {:.4f}".format(epoch+1, epochs, np.mean(loss_list)))
+            pbar.set_description("Loss: %0.5g, Epochs" % (np.mean(loss_list)))
+
+        acc = get_n_way_accuracy(2, test_set, training_set, model)
+        print(acc)
+        out_file.write(f"Group dropped: {group_to_drop}; Accuracy: {acc}\n")
+    out_file.close()

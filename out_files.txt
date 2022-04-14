@@ -1,0 +1,12 @@
+Group dropped: base; Accuracy: 0.6153846153846153
+Group dropped: acceleration; Accuracy: 0.6825641025641025
+Group dropped: speed; Accuracy: 0.6564102564102565
+Group dropped: distance; Accuracy: 0.6825641025641025
+Group dropped: pedal; Accuracy: 0.6743589743589743
+Group dropped: lane; Accuracy: 0.6148717948717949
+Group dropped: rainsnow; Accuracy: 0.6579487179487179
+Group dropped: angle; Accuracy: 0.6435897435897435
+Group dropped: indicator; Accuracy: 0.6376923076923077
+Group dropped: headlight; Accuracy: 0.6728205128205129
+Group dropped: horn; Accuracy: 0.6684615384615384
+Group dropped: gearbox; Accuracy: 0.6502564102564102
