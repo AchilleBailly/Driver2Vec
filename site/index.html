@@ -73,7 +73,7 @@
                         </a>
                     </li>
                     <li>
-                        <a href="https://github.com/AchilleBailly/Driver2Vec/edit/master/docs/index.md"><i class="fab fa-github"></i> Edit on GitHub</a>
+                        <a href="https://github.com/AchilleBailly/Driver2Vec/"><i class="fab fa-github"></i> GitHub</a>
                     </li>
             </ul>
         </div>
@@ -93,9 +93,25 @@
                 
             <li class="second-level"><a href="#haar-wavelet-transform">Haar Wavelet Transform</a></li>
                 
+            <li class="second-level"><a href="#full-architecture">Full architecture</a></li>
+                
+            <li class="second-level"><a href="#triplet-margin-loss">Triplet Margin Loss</a></li>
+                
             <li class="second-level"><a href="#gradient-boosting-decision-trees-lightgbm">Gradient Boosting Decision Trees (LightGBM)</a></li>
                 
         <li class="first-level "><a href="#data">Data</a></li>
+            <li class="second-level"><a href="#nine-groups">Nine groups</a></li>
+                
+                <li class="third-level"><a href="#1-acceleration">1. Acceleration</a></li>
+                <li class="third-level"><a href="#2-distance-information">2. Distance information</a></li>
+                <li class="third-level"><a href="#3-gearbox">3. Gearbox</a></li>
+                <li class="third-level"><a href="#4-lane-information">4. Lane Information</a></li>
+                <li class="third-level"><a href="#5-pedals">5. Pedals</a></li>
+                <li class="third-level"><a href="#6-road-angle">6. Road Angle</a></li>
+                <li class="third-level"><a href="#7-speed">7. Speed</a></li>
+                <li class="third-level"><a href="#8-turn-indicators">8. Turn indicators</a></li>
+                <li class="third-level"><a href="#9-uncategorized">9. Uncategorized</a></li>
+                <li class="third-level"><a href="#10-omitted-from-driver2vec">(10. Omitted from Driver2Vec)</a></li>
         <li class="first-level "><a href="#results">Results</a></li>
         <li class="first-level "><a href="#reference">Reference</a></li>
     </ul>
@@ -103,11 +119,11 @@
         <div class="col-md-9" role="main">
 
 <h1 id="driver2vec">Driver2Vec</h1>
-<p>Reproduction of Driver2Vec paper. </p>
+<p>Reproduction of Driver2Vec paper by Yang et al. (2021). </p>
 <p>Authors: Danish Khan, Achille Bailly and Mingjia He </p>
 <h2 id="introduction">Introduction</h2>
-<p>The neural network architecture Driver2Vec is discussed and used to detect drivers from automotive data in this blogpost. Yang et al. published a paper in 2021 that explained and evaluated Driver2Vec, which outperformed other architectures at that time. Driver2Vec (is the first architecture that) blends temporal convolution with triplet loss using time series data <a href="#1">[1]</a>. With this embedding, it is possible to classify different driving styles. The purpose of this blog post is to give a full explanation of this architecture as well as to develop it from the ground up.</p>
-<p>Researchers employ sensors found in current automobiles to determine distinct driving patterns. In this manner, the efficacy is not dependent on invasive data, such as facial recognition or fingerprints. A system like this may detect who is driving the car and alter its vehicle settings accordingly. Furthermore, a system that recognizes driver types with high accuracy may be used to identify unfamiliar driving patterns, lowering the chance of theft.</p>
+<p>The neural network architecture Driver2Vec is discussed and used to detect drivers from automotive data in this blogpost. Yang et al. published a paper in 2021 that explained and evaluated Driver2Vec, which outperformed other architectures at that time. Driver2Vec (is the first architecture that) blends temporal convolution with triplet loss using time series data <a href="#1">[1]</a>. With this embedding, it is possible to classify different driving styles. The purpose of this reproducibility project is to recreate the Driver2Vec architecture and reproduce Table 5 from the original paper. The purpose of this blog post is to give a full explanation of this architecture as well as to develop it from the ground up.</p>
+<p>Researchers employ sensors found in modern vehicles to determine distinct driving patterns. In this manner, the efficacy is not dependent on invasive data, such as facial recognition or fingerprints. A system like this may detect who is driving the car and alter its vehicle settings accordingly. Furthermore, a system that recognizes driver types with high accuracy may be used to identify unfamiliar driving patterns, lowering the chance of theft.</p>
 <h1 id="method">Method</h1>
 <p>Driver2Vec transforms a 10-second clip of sensor data to an embedding that is being used to identify different driving styles <a href="#1">[1]</a>. This procedure can be broken down into two steps. In the first stage, a temporal convolutional network (TCN) and a Haar wavelet transform are utilized individually, then concatenated to generate a 62-length embedding. This embedding is intended such that drivers with similar driving styles are near to one another while drivers with different driving styles are further apart.</p>
 <h2 id="temporal-convolutional-network-tcn">Temporal Convolutional Network (TCN)</h2>
@@ -117,44 +133,330 @@ The principle of TCN consists of two aspects: </p>
 <li>The output of TCN has the same length as the input. </li>
 <li>TCN uses causal convolutions, where an output at a specific time step is only depend on the input from this time step and earlier in the previous layer.</li>
 </ol>
-<p>To ensure the first principle, zero padding is applied. As shown in Figure 1, the zero padding is applied on the left side of the input tensor and ensure causal convolution. In this case, the kernel size is 3 and the input length is 4. With a padding size of 2, the output length is equal to the input length. </p>
+<p>To ensure the first principle, zero padding is applied. As shown in Figure <a href="#Figure 1">1</a>, the zero padding is applied on the left side of the input tensor and ensure causal convolution. In this case, the kernel size is 3 and the input length is 4. With a padding size of 2, the output length is equal to the input length. </p>
+<p><a id="Figure 1"></p>
 <div style="text-align:center"><img src="https://user-images.githubusercontent.com/101323945/161212963-e3fcf12a-edd9-4c15-9f1a-f37c42b28ab2.png" /></div>
-<p><center>
+<p></a>
+<center>
 Figure 1. Zero padding <a href="#2">[2]</a>
 </center></p>
-<p>One of the problems of casual convolution is that the history size it can cover is linear in the depth of network. Simple casual convolution could be challenging when dealing with sequential tasks that require a long history coverage, as very deep network would have many parameters, which may expand training time and lead to overfitting. Thus, dilated convolution is used to increase the receptive field size while having a small number of layers. Dilation is the name for the interval length between the elements in a layer used to compute one element of the next layer. The convolution with a dilation of one is a simple regular convolution. In TCN, dilation exponentially increases as progress through the layers. As shown in Figure 2, as the network moves deeper, the elements in the next layer cover larger range of elements in the previous layer.</p>
+<p>One of the problems of casual convolution is that the history size it can cover is linear in the depth of network. Simple casual convolution could be challenging when dealing with sequential tasks that require a long history coverage, as very deep network would have many parameters, which may expand training time and lead to overfitting. Thus, dilated convolution is used to increase the receptive field size while having a small number of layers. Dilation is the name for the interval length between the elements in a layer used to compute one element of the next layer. The convolution with a dilation of one is a simple regular convolution. In TCN, dilation exponentially increases as progress through the layers. As shown in Figure <a href="#Figure 2">2</a>, as the network moves deeper, the elements in the next layer cover larger range of elements in the previous layer.</p>
+<p><a id="Figure 2"></p>
 <div style="text-align:center"><img src="https://user-images.githubusercontent.com/101323945/161215806-812c7e4f-661e-49a6-b189-e8ad72517d3c.png" /></div>
-<p><center>
+<p></a>
+<center>
 Figure 2. An example of dilated causal convolution <a href="#3">[3]</a>
 </center></p>
-<p>TCN employs generic residual module in place of a convolutional layer. The structure of residual connection is shown in Figure 3, in each residual block, TCN has two layers including dilated causal convolution, weight normalization, rectified linear unit (ReLU) and dropout. </p>
+<p>TCN employs generic residual module in place of a convolutional layer. The structure of residual connection is shown in Figure <a href="#Figure 3">3</a>, in each residual block, TCN has two layers including dilated causal convolution, weight normalization, rectified linear unit (ReLU) and dropout. </p>
+<p><a id="Figure 3"></p>
 <div style="text-align:center"><img src="https://user-images.githubusercontent.com/101323945/161216087-b0570b3b-dcf5-4b4b-87ef-6c2ea2abfc77.png" /></div>
-<p><center>
+<p></a>
+<center>
 Figure 3. The residual module in TCN <a href="#3">[3]</a>
 </center></p>
 <h2 id="haar-wavelet-transform">Haar Wavelet Transform</h2>
 <p>Driver2vec applied Haar wavelet transformation to generates two vectors in the frequency domain. Wavelet Transform decomposes a time series function into a set of wavelets. A Wavelet is an oscillation use to decompose the signal, which has two characteristics, scale and location. Large scale can capture low frequency information and conversely, small scale is designed for high frequency information. Location defines the time and space of the wavelet. </p>
-<p>The essence of Wavelet Transform is to how much of a wavelet is in a signal for a particular scale and location. The process of Wavelet Transform consists of four steps: </p>
-<p>1) the wavelet moves across the entire signal with various location;
-2) the coefficients of trend and fluctuation for at each time step is calculated use scalar product (in following equations);
-3) increase the wavelet scale and repeat the process.</p>
+<p>The essence of Wavelet Transform is to measure how much of a wavelet is in a signal for a particular scale and location. The process of Wavelet Transform consists of four steps: </p>
+<ol>
+<li>the wavelet moves across the entire signal with various location</li>
+<li>the coefficients of trend and fluctuation for at each time step is calculated use scalar product (in following equations)</li>
+<li>increase the wavelet scale</li>
+<li>repeat the process.</li>
+</ol>
 <div class="arithmatex">\[a_{m}=f \cdot W_{m}\]</div>
 <div class="arithmatex">\[d_m = f \cdot V_m\]</div>
-<p>Most specifically, the Haar transform decomposes a discrete signal into two sub-signals of half its length, one is a running average or trend and the other is a running difference or fluctuation. As shown in the following equations, the first trend subsignal is computed from the average of two values and fluctuation, the second trend subsignal, is computed by taking a running difference, as shown in Equation 2. This structure enable transform to detect small fluctuations feature in signals. Figure 3 shows how Haar transform derives sub-signals for the signal f=(4, 6, 10, 12, 8, 6, 5, 5)</p>
+<p>Most specifically, the Haar transform decomposes a discrete signal into two sub-signals of half its length, one is a running average or trend and the other is a running difference or fluctuation. As shown in the following equations, the first trend subsignal is computed from the average of two values and fluctuation, the second trend subsignal, is computed by taking a running difference, as shown in Equation 2. This structure enable transform to detect small fluctuations feature in signals. Figure <a href="#Figure 4">4</a> shows how Haar transform derives sub-signals for the signal <span class="arithmatex">\(f=(4, 6, 10, 12, 8, 6, 5, 5)\)</span></p>
 <div class="arithmatex">\[ a_m = \frac{f_{2m-1} + f_{2m+1}}{\sqrt{2}}\]</div>
-<div class="arithmatex">\[ a_m = \frac{f_{2m-1} - f_{2m+1}}{\sqrt{2}}\]</div>
+<div class="arithmatex">\[ d_m = \frac{f_{2m-1} - f_{2m+1}}{\sqrt{2}}\]</div>
+<p><a id="Figure 4"></p>
 <div style="text-align:center"><img width="550" src="https://user-images.githubusercontent.com/101323945/161373770-d9e80326-a68f-4522-9e99-5868b88a912d.png" /></div>
-<p><center>
+<p></a>
+<center>
 Figure 4. An example for Haar transform <a href="#4">[4]</a>
 </center></p>
+<h2 id="full-architecture">Full architecture</h2>
+<p>The two vectors that the wavelet transform outputs are then fed through a Fully Connected (FC) layer to map them to a 15 dimensional vector. Both of them are concatenated with the last output of the TCN and fed through a final FC layer with Batch Normalization and a sigmoid activation function to get our final embedding. </p>
+<h2 id="triplet-margin-loss">Triplet Margin Loss</h2>
+<p>Once we the embedding from the full architecture, we need a way to train the network. With no ground truth to compare the output to, the <em>triplet margin loss</em> is used. At its core, this criterion pulls together the embeddings that are supposed to be close and pushes away the ones that are not. Mathematically, it is defined as follows:</p>
+<div class="arithmatex">\[ \textbf{L}(x_{r},x_{p},x_{n})=max(0,D_{rp}^{2} + D_{rp}^{2} + \alpha) \]</div>
+<p>Where <span class="arithmatex">\(x_{r,p,n}\)</span> are the embeddings for the anchor, positive and negative samples respectively, <span class="arithmatex">\(D_{rp}\)</span> (resp. <span class="arithmatex">\(D_{rn}\)</span>) is the distance (usually euclidian) between the anchor and the positive embdeggings (resp. negative) and <span class="arithmatex">\(\alpha\)</span> is a positive number called the margin (often set to <span class="arithmatex">\(1.0\)</span>).</p>
+<p>Essentially, it is trying to make sure that the following inequation is respected:</p>
+<div class="arithmatex">\[ D_{rp}^{2} + \alpha \less D_{rp}^{2} \]</div>
+<p>With the available dataset being so limited, choosing the positive and negative samples for each anchor at random is probably enough. In most cases however, the most efficient way of choosing them is to pick the worst ones for each anchor (see <a href="#5">[5]</a>), i.e. chossing the positive sample that is the farthest away and the negative one that is the closest. Again, for more detail on how to actually do that efficiently, go to the website referenced in <a href="#5">[5]</a> for a very detailed explanation.</p>
 <h2 id="gradient-boosting-decision-trees-lightgbm">Gradient Boosting Decision Trees (LightGBM)</h2>
 <h1 id="data">Data</h1>
+<p>The original dataset includes 51 anonymous driver test drives on four distinct types of roads (highway, suburban, urban, and tutorial), with each driver spending roughly fifteen minutes on a high-end driving simulator built by Nervtech <a href="#1">[1]</a>. However, this entire dataset is not made publicly available and instead, only a small sample of the dataset can be found in a <a href="https://anonymous.4open.science/r/c5cfe6e9-4a5b-4fc6-8211-51193f50119e/" target="_blank">anonymized repository</a> on Github. Instead of 51 drivers and fifteen minutes of recording time, this sample has ten second samples captured at 100Hz of five drivers for each distinct road type. As a result, the sample size is dramatically reduced. </p>
+<h2 id="nine-groups">Nine groups</h2>
+<p>The columns remain identical. Although both the original and sampled datasets include 38 columns, only 31 of them are used for the architecture, which is divided into nine categories.</p>
+<h3 id="1-acceleration">1. Acceleration</h3>
+<table>
+<thead>
+<tr>
+<th>Column names</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ACCELERATION</code></td>
+<td>acceleration in X axis</td>
+</tr>
+<tr>
+<td><code>ACCELERATION_Y</code></td>
+<td>acceleration in Y axis</td>
+</tr>
+<tr>
+<td><code>ACCELERATION_Z</code></td>
+<td>acceleration in Z axis</td>
+</tr>
+</tbody>
+</table>
+<h3 id="2-distance-information">2. Distance information</h3>
+<table>
+<thead>
+<tr>
+<th>Column names</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DISTANCE_TO_NEXT_VEHICLE</code></td>
+<td>distance to next vehicle</td>
+</tr>
+<tr>
+<td><code>DISTANCE_TO_NEXT_INTERSECTION</code></td>
+<td>distance to next intersection</td>
+</tr>
+<tr>
+<td><code>DISTANCE_TO_NEXT_STOP_SIGNAL</code></td>
+<td>distance to next stop signal</td>
+</tr>
+<tr>
+<td><code>DISTANCE_TO_NEXT_TRAFFIC_LIGHT_SIGNAL</code></td>
+<td>distance to next traffic light</td>
+</tr>
+<tr>
+<td><code>DISTANCE_TO_NEXT_YIELD_SIGNAL</code></td>
+<td>distance to next yield signal</td>
+</tr>
+<tr>
+<td><code>DISTANCE</code></td>
+<td>distance to completion</td>
+</tr>
+</tbody>
+</table>
+<h3 id="3-gearbox">3. Gearbox</h3>
+<table>
+<thead>
+<tr>
+<th>Column names</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GEARBOX</code></td>
+<td>whether gearbox is used</td>
+</tr>
+<tr>
+<td><code>CLUTCH_PEDAL</code></td>
+<td>whether clutch pedal is pressed</td>
+</tr>
+</tbody>
+</table>
+<h3 id="4-lane-information">4. Lane Information</h3>
+<table>
+<thead>
+<tr>
+<th>Column names</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LANE</code></td>
+<td>lane that the vehicle is in</td>
+</tr>
+<tr>
+<td><code>FAST_LANE</code></td>
+<td>whether vehicle is in the fast lane</td>
+</tr>
+<tr>
+<td><code>LANE_LATERAL_SHIFT_RIGHT</code></td>
+<td>location in lane (right)</td>
+</tr>
+<tr>
+<td><code>LANE_LATERAL_SHIFT_CENTER</code></td>
+<td>location in lane (center)</td>
+</tr>
+<tr>
+<td><code>LANE_LATERAL_SHIFT_LEFT</code></td>
+<td>location in lane (left)</td>
+</tr>
+<tr>
+<td><code>LANE_WIDTH</code></td>
+<td>width of lane</td>
+</tr>
+</tbody>
+</table>
+<h3 id="5-pedals">5. Pedals</h3>
+<table>
+<thead>
+<tr>
+<th>Column names</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ACCELERATION_PEDAL</code></td>
+<td>whether acceleration pedal is pressed</td>
+</tr>
+<tr>
+<td><code>BRAKE_PEDAL</code></td>
+<td>whether break pedal is pressed</td>
+</tr>
+</tbody>
+</table>
+<h3 id="6-road-angle">6. Road Angle</h3>
+<table>
+<thead>
+<tr>
+<th>Column names</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>STEERING_WHEEL</code></td>
+<td>angle of steering wheel</td>
+</tr>
+<tr>
+<td><code>CURVE_RADIUS</code></td>
+<td>radius of road (if there is a curve)</td>
+</tr>
+<tr>
+<td><code>ROAD_ANGLE</code></td>
+<td>angle of road</td>
+</tr>
+</tbody>
+</table>
+<h3 id="7-speed">7. Speed</h3>
+<table>
+<thead>
+<tr>
+<th>Column names</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SPEED</code></td>
+<td>speed in X axis</td>
+</tr>
+<tr>
+<td><code>SPEED_Y</code></td>
+<td>speed in Y axis</td>
+</tr>
+<tr>
+<td><code>SPEED_Z</code></td>
+<td>speed in Z axis</td>
+</tr>
+<tr>
+<td><code>SPEED_NEXT_VEHICLE</code></td>
+<td>speed of the next vehicle</td>
+</tr>
+<tr>
+<td><code>SPEED_LIMIT</code></td>
+<td>speed limit of road</td>
+</tr>
+</tbody>
+</table>
+<h3 id="8-turn-indicators">8. Turn indicators</h3>
+<table>
+<thead>
+<tr>
+<th>Column names</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>INDICATORS</code></td>
+<td>whether turn indicator is on</td>
+</tr>
+<tr>
+<td><code>INDICATORS_ON_INTERSECTION</code></td>
+<td>whether turn indicator is activated for an intersection</td>
+</tr>
+</tbody>
+</table>
+<h3 id="9-uncategorized">9. Uncategorized</h3>
+<table>
+<thead>
+<tr>
+<th>Column names</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>HORN</code></td>
+<td>whether horn is activated</td>
+</tr>
+<tr>
+<td><code>HEADING</code></td>
+<td>heading of vehicle</td>
+</tr>
+</tbody>
+</table>
+<h3 id="10-omitted-from-driver2vec">(10. Omitted from Driver2Vec)</h3>
+<table>
+<thead>
+<tr>
+<th>Column names</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FOG</code></td>
+<td>whether there is fog</td>
+</tr>
+<tr>
+<td><code>FOG_LIGHTS</code></td>
+<td>whether fog light is on</td>
+</tr>
+<tr>
+<td><code>FRONT_WIPERS</code></td>
+<td>whether front wiper is activated</td>
+</tr>
+<tr>
+<td><code>HEAD_LIGHTS</code></td>
+<td>whether headlights are used</td>
+</tr>
+<tr>
+<td><code>RAIN</code></td>
+<td>whether there is rain</td>
+</tr>
+<tr>
+<td><code>REAR_WIPERS</code></td>
+<td>whether rear wiper is activated</td>
+</tr>
+<tr>
+<td><code>SNOW</code></td>
+<td>whether there is snow</td>
+</tr>
+</tbody>
+</table>
 <h1 id="results">Results</h1>
 <h1 id="reference">Reference</h1>
 <p><a id="1">[1]</a>  Yang, J., Zhao, R., Zhu, M., Hallac, D., Sodnik, J., &amp; Leskovec, J. (2021). Driver2vec: Driver identification from automotive data. arXiv preprint arXiv:2102.05234.</p>
 <p><a id="2">[2]</a> Francesco, L. (2021). Temporal Convolutional Networks and Forecasting. https://unit8.com/resources/temporal-convolutional-networks-and-forecasting/</p>
 <p><a id="3">[3]</a> Bai, S., Kolter, J. Z., &amp; Koltun, V. (2018). An empirical evaluation of generic convolutional and recurrent networks for sequence modeling. arXiv preprint arXiv:1803.01271.</p>
-<p><a id="4">[4]</a> Haar Wavelets http://dsp-book.narod.ru/PWSA/8276_01.pdf</p></div>
+<p><a id="4">[4]</a> Haar Wavelets http://dsp-book.narod.ru/PWSA/8276_01.pdf</p>
+<p><a id="5">[5]</a> Good explanation and implementation (in Tensorflow) of the Triplet Loss: https://omoindrot.github.io/triplet-loss</p></div>
         
         
     </div>
@@ -262,5 +564,5 @@ Figure 4. An example for Haar transform <a href="#4">[4]</a>
 
 <!--
 MkDocs version : 1.3.0
-Build Date UTC : 2022-04-12 20:48:29.392491+00:00
+Build Date UTC : 2022-04-14 15:01:45.421508+00:00
 -->
