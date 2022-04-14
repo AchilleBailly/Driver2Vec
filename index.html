@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    
+    <link rel="canonical" href="https://achillebailly.github.io/Driver2Vec/">
+    <link rel="shortcut icon" href="img/favicon.ico">
+
+    
+    <title>Driver2Vec - Driver2Vec</title>
+    
+
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/all.css">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.12.0/css/v4-shims.css">
+    <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/hack-font@3.3.0/build/web/hack.min.css">
+    <link href='//rsms.me/inter/inter.css' rel='stylesheet' type='text/css'>
+    <link href='//fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,700italic,400,300,600,700&subset=latin-ext,latin' rel='stylesheet' type='text/css'>
+    <link href="css/bootstrap-custom.min.css" rel="stylesheet">
+    <link href="css/base.min.css" rel="stylesheet">
+    <link href="css/cinder.min.css" rel="stylesheet">
+
+    
+        
+        <link rel="stylesheet" href="//cdn.jsdelivr.net/gh/highlightjs/cdn-release@9.18.0/build/styles/github.min.css">
+        
+    
+
+    <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!--[if lt IE 9]>
+            <script src="https://cdn.jsdelivr.net/npm/html5shiv@3.7.3/dist/html5shiv.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/respond.js@1.4.2/dest/respond.min.js"></script>
+        <![endif]-->
+
+    
+
+     
+</head>
+
+<body class="homepage" >
+
+    <div class="navbar navbar-default navbar-fixed-top" role="navigation">
+    <div class="container">
+
+        <!-- Collapsed navigation -->
+        <div class="navbar-header">
+            <!-- Expander button -->
+            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+            
+
+            <!-- Main title -->
+
+            
+              <a class="navbar-brand" href=".">Driver2Vec</a>
+            
+        </div>
+
+        <!-- Expanded navigation -->
+        <div class="navbar-collapse collapse">
+
+            <ul class="nav navbar-nav navbar-right">
+                    <li>
+                        <a href="#" data-toggle="modal" data-target="#mkdocs_search_modal">
+                            <i class="fas fa-search"></i> Search
+                        </a>
+                    </li>
+                    <li>
+                        <a href="https://github.com/AchilleBailly/Driver2Vec/"><i class="fab fa-github"></i> GitHub</a>
+                    </li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+    <div class="container">
+        
+        
+        <div class="col-md-3"><div class="bs-sidebar hidden-print affix well" role="complementary">
+    <ul class="nav bs-sidenav">
+        <li class="first-level active"><a href="#driver2vec">Driver2Vec</a></li>
+            <li class="second-level"><a href="#introduction">Introduction</a></li>
+                
+        <li class="first-level "><a href="#method">Method</a></li>
+            <li class="second-level"><a href="#temporal-convolutional-network-tcn">Temporal Convolutional Network (TCN)</a></li>
+                
+            <li class="second-level"><a href="#haar-wavelet-transform">Haar Wavelet Transform</a></li>
+                
+            <li class="second-level"><a href="#full-architecture">Full architecture</a></li>
+                
+            <li class="second-level"><a href="#triplet-margin-loss">Triplet Margin Loss</a></li>
+                
+            <li class="second-level"><a href="#gradient-boosting-decision-trees-lightgbm">Gradient Boosting Decision Trees (LightGBM)</a></li>
+                
+        <li class="first-level "><a href="#data">Data</a></li>
+            <li class="second-level"><a href="#nine-groups">Nine groups</a></li>
+                
+                <li class="third-level"><a href="#1-acceleration">1. Acceleration</a></li>
+                <li class="third-level"><a href="#2-distance-information">2. Distance information</a></li>
+                <li class="third-level"><a href="#3-gearbox">3. Gearbox</a></li>
+                <li class="third-level"><a href="#4-lane-information">4. Lane Information</a></li>
+                <li class="third-level"><a href="#5-pedals">5. Pedals</a></li>
+                <li class="third-level"><a href="#6-road-angle">6. Road Angle</a></li>
+                <li class="third-level"><a href="#7-speed">7. Speed</a></li>
+                <li class="third-level"><a href="#8-turn-indicators">8. Turn indicators</a></li>
+                <li class="third-level"><a href="#9-uncategorized">9. Uncategorized</a></li>
+                <li class="third-level"><a href="#10-omitted-from-driver2vec">(10. Omitted from Driver2Vec)</a></li>
+        <li class="first-level "><a href="#results">Results</a></li>
+        <li class="first-level "><a href="#reference">Reference</a></li>
+    </ul>
+</div></div>
+        <div class="col-md-9" role="main">
+
+<h1 id="driver2vec">Driver2Vec</h1>
+<p>Reproduction of Driver2Vec paper by Yang et al. (2021). </p>
+<p>Authors: Danish Khan, Achille Bailly and Mingjia He </p>
+<h2 id="introduction">Introduction</h2>
+<p>The neural network architecture Driver2Vec is discussed and used to detect drivers from automotive data in this blogpost. Yang et al. published a paper in 2021 that explained and evaluated Driver2Vec, which outperformed other architectures at that time. Driver2Vec (is the first architecture that) blends temporal convolution with triplet loss using time series data <a href="#1">[1]</a>. With this embedding, it is possible to classify different driving styles. The purpose of this reproducibility project is to recreate the Driver2Vec architecture and reproduce Table 5 from the original paper. The purpose of this blog post is to give a full explanation of this architecture as well as to develop it from the ground up.</p>
+<p>Researchers employ sensors found in modern vehicles to determine distinct driving patterns. In this manner, the efficacy is not dependent on invasive data, such as facial recognition or fingerprints. A system like this may detect who is driving the car and alter its vehicle settings accordingly. Furthermore, a system that recognizes driver types with high accuracy may be used to identify unfamiliar driving patterns, lowering the chance of theft.</p>
+<h1 id="method">Method</h1>
+<p>Driver2Vec transforms a 10-second clip of sensor data to an embedding that is being used to identify different driving styles <a href="#1">[1]</a>. This procedure can be broken down into two steps. In the first stage, a temporal convolutional network (TCN) and a Haar wavelet transform are utilized individually, then concatenated to generate a 62-length embedding. This embedding is intended such that drivers with similar driving styles are near to one another while drivers with different driving styles are further apart.</p>
+<h2 id="temporal-convolutional-network-tcn">Temporal Convolutional Network (TCN)</h2>
+<p>Temporal Convolutional Networks (TCN) combines the architecture of convolutional networks and recurrent networks. 
+The principle of TCN consists of two aspects: </p>
+<ol>
+<li>The output of TCN has the same length as the input. </li>
+<li>TCN uses causal convolutions, where an output at a specific time step is only depend on the input from this time step and earlier in the previous layer.</li>
+</ol>
+<p>To ensure the first principle, zero padding is applied. As shown in Figure <a href="#Figure 1">1</a>, the zero padding is applied on the left side of the input tensor and ensure causal convolution. In this case, the kernel size is 3 and the input length is 4. With a padding size of 2, the output length is equal to the input length. </p>
+<p><a id="Figure 1"></p>
+<div style="text-align:center"><img src="https://user-images.githubusercontent.com/101323945/161212963-e3fcf12a-edd9-4c15-9f1a-f37c42b28ab2.png" /></div>
+<p></a>
+<center>
+Figure 1. Zero padding <a href="#2">[2]</a>
+</center></p>
+<p>One of the problems of casual convolution is that the history size it can cover is linear in the depth of network. Simple casual convolution could be challenging when dealing with sequential tasks that require a long history coverage, as very deep network would have many parameters, which may expand training time and lead to overfitting. Thus, dilated convolution is used to increase the receptive field size while having a small number of layers. Dilation is the name for the interval length between the elements in a layer used to compute one element of the next layer. The convolution with a dilation of one is a simple regular convolution. In TCN, dilation exponentially increases as progress through the layers. As shown in Figure <a href="#Figure 2">2</a>, as the network moves deeper, the elements in the next layer cover larger range of elements in the previous layer.</p>
+<p><a id="Figure 2"></p>
+<div style="text-align:center"><img src="https://user-images.githubusercontent.com/101323945/161215806-812c7e4f-661e-49a6-b189-e8ad72517d3c.png" /></div>
+<p></a>
+<center>
+Figure 2. An example of dilated causal convolution <a href="#3">[3]</a>
+</center></p>
+<p>TCN employs generic residual module in place of a convolutional layer. The structure of residual connection is shown in Figure <a href="#Figure 3">3</a>, in each residual block, TCN has two layers including dilated causal convolution, weight normalization, rectified linear unit (ReLU) and dropout. </p>
+<p><a id="Figure 3"></p>
+<div style="text-align:center"><img src="https://user-images.githubusercontent.com/101323945/161216087-b0570b3b-dcf5-4b4b-87ef-6c2ea2abfc77.png" /></div>
+<p></a>
+<center>
+Figure 3. The residual module in TCN <a href="#3">[3]</a>
+</center></p>
+<h2 id="haar-wavelet-transform">Haar Wavelet Transform</h2>
+<p>Driver2vec applied Haar wavelet transformation to generates two vectors in the frequency domain. Wavelet Transform decomposes a time series function into a set of wavelets. A Wavelet is an oscillation use to decompose the signal, which has two characteristics, scale and location. Large scale can capture low frequency information and conversely, small scale is designed for high frequency information. Location defines the time and space of the wavelet. </p>
+<p>The essence of Wavelet Transform is to measure how much of a wavelet is in a signal for a particular scale and location. The process of Wavelet Transform consists of four steps: </p>
+<ol>
+<li>the wavelet moves across the entire signal with various location</li>
+<li>the coefficients of trend and fluctuation for at each time step is calculated use scalar product (in following equations)</li>
+<li>increase the wavelet scale</li>
+<li>repeat the process.</li>
+</ol>
+<div class="arithmatex">\[a_{m}=f \cdot W_{m}\]</div>
+<div class="arithmatex">\[d_m = f \cdot V_m\]</div>
+<p>Most specifically, the Haar transform decomposes a discrete signal into two sub-signals of half its length, one is a running average or trend and the other is a running difference or fluctuation. As shown in the following equations, the first trend subsignal is computed from the average of two values and fluctuation, the second trend subsignal, is computed by taking a running difference, as shown in Equation 2. This structure enable transform to detect small fluctuations feature in signals. Figure <a href="#Figure 4">4</a> shows how Haar transform derives sub-signals for the signal <span class="arithmatex">\(f=(4, 6, 10, 12, 8, 6, 5, 5)\)</span></p>
+<div class="arithmatex">\[ a_m = \frac{f_{2m-1} + f_{2m+1}}{\sqrt{2}}\]</div>
+<div class="arithmatex">\[ d_m = \frac{f_{2m-1} - f_{2m+1}}{\sqrt{2}}\]</div>
+<p><a id="Figure 4"></p>
+<div style="text-align:center"><img width="550" src="https://user-images.githubusercontent.com/101323945/161373770-d9e80326-a68f-4522-9e99-5868b88a912d.png" /></div>
+<p></a>
+<center>
+Figure 4. An example for Haar transform <a href="#4">[4]</a>
+</center></p>
+<h2 id="full-architecture">Full architecture</h2>
+<p>The two vectors that the wavelet transform outputs are then fed through a Fully Connected (FC) layer to map them to a 15 dimensional vector. Both of them are concatenated with the last output of the TCN and fed through a final FC layer with Batch Normalization and a sigmoid activation function to get our final embedding. </p>
+<h2 id="triplet-margin-loss">Triplet Margin Loss</h2>
+<p>Once we the embedding from the full architecture, we need a way to train the network. With no ground truth to compare the output to, the <em>triplet margin loss</em> is used. At its core, this criterion pulls together the embeddings that are supposed to be close and pushes away the ones that are not. Mathematically, it is defined as follows:</p>
+<div class="arithmatex">\[ \mathbf{L}(x_{r},x_{p},x_{n})=\max(0,D_{rp}^{2} - D_{rn}^{2} + \alpha) \]</div>
+<p>Where <span class="arithmatex">\(x_r, x_p, x_n\)</span> are the embeddings for the anchor, positive and negative samples respectively, <span class="arithmatex">\(D_{rp}\)</span> (resp. <span class="arithmatex">\(D_{rn}\)</span>) is the distance (usually euclidean) between the anchor and the positive embeddings (resp. negative) and <span class="arithmatex">\(\alpha\)</span> is a positive number called the margin (often set to <span class="arithmatex">\(1.0\)</span>).</p>
+<p>Essentially, it is trying to make sure that the following inequality is respected:</p>
+<div class="arithmatex">\[ D_{rp}^{2} + \alpha &lt; D_{rp}^{2} \]</div>
+<p>With the available dataset being so limited, choosing the positive and negative samples for each anchor at random is probably enough. In most cases however, the most efficient way of choosing them is to pick the worst ones for each anchor (see <a href="#5">[5]</a>), i.e. choosing the positive sample that is the farthest away and the negative one that is the closest. Again, for more detail on how to actually do that efficiently, go to the website referenced in <a href="#5">[5]</a> for a very detailed explanation.</p>
+<p>In the end, we chose to implement the "hard" triplet loss as we thought it might resolve the issues we faced.</p>
+<h2 id="gradient-boosting-decision-trees-lightgbm">Gradient Boosting Decision Trees (LightGBM)</h2>
+<p>Before introducing Light GBM, we first illustrate what is boosting and how it can work. The goal of boosting is improving the prediction power converting weak learners into strong learners. The basic logit is to build a model on the training dataset, and then build the next model to rectify the errors present in the previous one. In this procedure, weights of observations are updates according to the rule that wrongly classified observations would have increasing weights. So, only those misclassified observations get selected in the next model and the procedure iterate until the errors are minimized.</p>
+<p>Gradient Boosting trains many models in an additive and sequential manner, using gradient decent to minimize the loss function One of the most popular types of gradient boosting is boosted decision trees. There are two different strategies to compute the trees: level-wise and leaf-wise, as shown in the following figure. The level-wise strategy grows the tree level by level. In this strategy, each node splits the data prioritizing the nodes closer to the tree root. The leaf-wise strategy grows the tree by splitting the data at the nodes with the highest loss change.</p>
+<p><a id="Figure 5"></p>
+<div style="text-align:center"><img width="550" src="https://user-images.githubusercontent.com/101323945/163355753-4eda483e-61ea-4634-aacf-e4f736e58a45.png" /></div>
+<p></a>
+<center>
+Figure 5. The level-wise strategy <a href="#6">[6]</a>
+</center></p>
+<p><a id="Figure 6"></p>
+<div style="text-align:center"><img width="550" src="https://user-images.githubusercontent.com/101323945/163355769-b5cb412b-249e-43ef-9729-180b50527689.png" /></div>
+<p></a>
+<center>
+Figure 6. The leaf-wise strategy <a href="#6">[6]</a>
+</center></p>
+<p>However, conventional gradient decision tree could be inefficient when dealing with large scale data set. That is why Light GBM is proposed, which is a gradient boosting decision tree with Gradient-based One-Side Sampling (GOSS) and Exclusive Feature Bundling (EFB). 
+Light GBM is based on tree-based learning algorithms growing tree vertically (leaf-wise).  It is designed to be  distributed and efficient with the following advantages <a href="#7">[7]</a>:</p>
+<p>•   Faster training speed and higher efficiency.</p>
+<p>•   Lower memory usage.</p>
+<p>•   Better accuracy.</p>
+<p>•   Support of parallel, distributed, and GPU learning.</p>
+<p>•   Capable of handling large-scale data.</p>
+<p>GOSS is a design for the sampling process with the aim to reduce computation cost and not lose much training accuracy. The instances with large gradients would be better kept considering those bearing more information gain, and the instances with small gradients will be randomly drop. EFB tries to effectively reduce the number of features in a nearly lossless manner. A feature scanning algorithm is designed to build feature histograms from the feature bundles. The algorithms used in presented in the following figures (refer to the work of Ke. G et al. <a href="#8">[8]</a>).</p>
+<div align=center><img width="550" height="300" alt="" src="https://user-images.githubusercontent.com/101323945/163355909-37c69ea4-0575-4709-94b9-7012e2874b38.png"/>
+</div>
+<div align=center><img width="550" height="300" alt="" src="https://user-images.githubusercontent.com/101323945/163355924-f46f4075-726f-4311-bf30-49ab9dd5f620.png"/>
+ </div>
+<p><center>
+Figure 7. Algorithms for Light GBM <a href="#8">[8]</a>
+</center></p>
+<p>Light GBM has been widely used due to its ability to handle the large size of data and takes lower memory to run. But it should be noted that there are shortcomings: Light GBM is sensitive to overfitting and can easily overfit small data. </p>
+<h1 id="data">Data</h1>
+<p>The original dataset includes 51 anonymous driver test drives on four distinct types of roads (highway, suburban, urban, and tutorial), with each driver spending roughly fifteen minutes on a high-end driving simulator built by Nervtech <a href="#1">[1]</a>. However, this entire dataset is not made publicly available and instead, only a small sample of the dataset can be found in a <a href="https://anonymous.4open.science/r/c5cfe6e9-4a5b-4fc6-8211-51193f50119e/" target="_blank">anonymized repository</a> on Github. Instead of 51 drivers and fifteen minutes of recording time, this sample has ten second samples captured at 100Hz of five drivers for each distinct road type. As a result, the sample size is dramatically reduced. </p>
+<h2 id="nine-groups">Nine groups</h2>
+<p>The columns remain identical. Although both the original and sampled datasets include 38 columns, only 31 of them are used for the architecture, which is divided into nine categories.</p>
+<h3 id="1-acceleration">1. Acceleration</h3>
+<table>
+<thead>
+<tr>
+<th>Column names</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ACCELERATION</code></td>
+<td>acceleration in X axis</td>
+</tr>
+<tr>
+<td><code>ACCELERATION_Y</code></td>
+<td>acceleration in Y axis</td>
+</tr>
+<tr>
+<td><code>ACCELERATION_Z</code></td>
+<td>acceleration in Z axis</td>
+</tr>
+</tbody>
+</table>
+<h3 id="2-distance-information">2. Distance information</h3>
+<table>
+<thead>
+<tr>
+<th>Column names</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DISTANCE_TO_NEXT_VEHICLE</code></td>
+<td>distance to next vehicle</td>
+</tr>
+<tr>
+<td><code>DISTANCE_TO_NEXT_INTERSECTION</code></td>
+<td>distance to next intersection</td>
+</tr>
+<tr>
+<td><code>DISTANCE_TO_NEXT_STOP_SIGNAL</code></td>
+<td>distance to next stop signal</td>
+</tr>
+<tr>
+<td><code>DISTANCE_TO_NEXT_TRAFFIC_LIGHT_SIGNAL</code></td>
+<td>distance to next traffic light</td>
+</tr>
+<tr>
+<td><code>DISTANCE_TO_NEXT_YIELD_SIGNAL</code></td>
+<td>distance to next yield signal</td>
+</tr>
+<tr>
+<td><code>DISTANCE</code></td>
+<td>distance to completion</td>
+</tr>
+</tbody>
+</table>
+<h3 id="3-gearbox">3. Gearbox</h3>
+<table>
+<thead>
+<tr>
+<th>Column names</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GEARBOX</code></td>
+<td>whether gearbox is used</td>
+</tr>
+<tr>
+<td><code>CLUTCH_PEDAL</code></td>
+<td>whether clutch pedal is pressed</td>
+</tr>
+</tbody>
+</table>
+<h3 id="4-lane-information">4. Lane Information</h3>
+<table>
+<thead>
+<tr>
+<th>Column names</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LANE</code></td>
+<td>lane that the vehicle is in</td>
+</tr>
+<tr>
+<td><code>FAST_LANE</code></td>
+<td>whether vehicle is in the fast lane</td>
+</tr>
+<tr>
+<td><code>LANE_LATERAL_SHIFT_RIGHT</code></td>
+<td>location in lane (right)</td>
+</tr>
+<tr>
+<td><code>LANE_LATERAL_SHIFT_CENTER</code></td>
+<td>location in lane (center)</td>
+</tr>
+<tr>
+<td><code>LANE_LATERAL_SHIFT_LEFT</code></td>
+<td>location in lane (left)</td>
+</tr>
+<tr>
+<td><code>LANE_WIDTH</code></td>
+<td>width of lane</td>
+</tr>
+</tbody>
+</table>
+<h3 id="5-pedals">5. Pedals</h3>
+<table>
+<thead>
+<tr>
+<th>Column names</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ACCELERATION_PEDAL</code></td>
+<td>whether acceleration pedal is pressed</td>
+</tr>
+<tr>
+<td><code>BRAKE_PEDAL</code></td>
+<td>whether break pedal is pressed</td>
+</tr>
+</tbody>
+</table>
+<h3 id="6-road-angle">6. Road Angle</h3>
+<table>
+<thead>
+<tr>
+<th>Column names</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>STEERING_WHEEL</code></td>
+<td>angle of steering wheel</td>
+</tr>
+<tr>
+<td><code>CURVE_RADIUS</code></td>
+<td>radius of road (if there is a curve)</td>
+</tr>
+<tr>
+<td><code>ROAD_ANGLE</code></td>
+<td>angle of road</td>
+</tr>
+</tbody>
+</table>
+<h3 id="7-speed">7. Speed</h3>
+<table>
+<thead>
+<tr>
+<th>Column names</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SPEED</code></td>
+<td>speed in X axis</td>
+</tr>
+<tr>
+<td><code>SPEED_Y</code></td>
+<td>speed in Y axis</td>
+</tr>
+<tr>
+<td><code>SPEED_Z</code></td>
+<td>speed in Z axis</td>
+</tr>
+<tr>
+<td><code>SPEED_NEXT_VEHICLE</code></td>
+<td>speed of the next vehicle</td>
+</tr>
+<tr>
+<td><code>SPEED_LIMIT</code></td>
+<td>speed limit of road</td>
+</tr>
+</tbody>
+</table>
+<h3 id="8-turn-indicators">8. Turn indicators</h3>
+<table>
+<thead>
+<tr>
+<th>Column names</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>INDICATORS</code></td>
+<td>whether turn indicator is on</td>
+</tr>
+<tr>
+<td><code>INDICATORS_ON_INTERSECTION</code></td>
+<td>whether turn indicator is activated for an intersection</td>
+</tr>
+</tbody>
+</table>
+<h3 id="9-uncategorized">9. Uncategorized</h3>
+<table>
+<thead>
+<tr>
+<th>Column names</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>HORN</code></td>
+<td>whether horn is activated</td>
+</tr>
+<tr>
+<td><code>HEADING</code></td>
+<td>heading of vehicle</td>
+</tr>
+</tbody>
+</table>
+<h3 id="10-omitted-from-driver2vec">(10. Omitted from Driver2Vec)</h3>
+<table>
+<thead>
+<tr>
+<th>Column names</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FOG</code></td>
+<td>whether there is fog</td>
+</tr>
+<tr>
+<td><code>FOG_LIGHTS</code></td>
+<td>whether fog light is on</td>
+</tr>
+<tr>
+<td><code>FRONT_WIPERS</code></td>
+<td>whether front wiper is activated</td>
+</tr>
+<tr>
+<td><code>HEAD_LIGHTS</code></td>
+<td>whether headlights are used</td>
+</tr>
+<tr>
+<td><code>RAIN</code></td>
+<td>whether there is rain</td>
+</tr>
+<tr>
+<td><code>REAR_WIPERS</code></td>
+<td>whether rear wiper is activated</td>
+</tr>
+<tr>
+<td><code>SNOW</code></td>
+<td>whether there is snow</td>
+</tr>
+</tbody>
+</table>
+<h1 id="results">Results</h1>
+<p>After reconstructing the Driver2Vec architecture, we let this model train on the sampled data. The performance is assessed by looking at the pairwise accuracy. This means that we are now in a binary classification setting, where the model does a prediction on every possible pair among all five drivers. The average accuracy is then reported. Moreover, the (average) pairwise accuracy is computed after having each sensor group removed from the data. This way the ablation study on Driver2Vec (Table 5 from original paper) is redone.</p>
+<table>
+<thead>
+<tr>
+<th>Removed Sensor Group</th>
+<th>Original Pairwise Accuracy (%)</th>
+<th>Pairwise Accuracy (%)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Speed, acceleration only</code></td>
+<td>66.3</td>
+<td>66.7</td>
+</tr>
+<tr>
+<td><code>Distance information</code></td>
+<td>74.6</td>
+<td>65.7</td>
+</tr>
+<tr>
+<td><code>Lane information</code></td>
+<td>77.8</td>
+<td>68.3</td>
+</tr>
+<tr>
+<td><code>Acceleration/break pedal</code></td>
+<td>78.1</td>
+<td>69.5</td>
+</tr>
+<tr>
+<td><code>Speed</code></td>
+<td>78.8</td>
+<td>65.3</td>
+</tr>
+<tr>
+<td><code>Gear box</code></td>
+<td>79.0</td>
+<td>56.5</td>
+</tr>
+<tr>
+<td><code>Acceleration</code></td>
+<td>79.1</td>
+<td>66.7</td>
+</tr>
+<tr>
+<td><code>Steering wheel/road angle</code></td>
+<td>79.2</td>
+<td>69.7</td>
+</tr>
+<tr>
+<td><code>Turn indicators</code></td>
+<td>79.3</td>
+<td>64.7</td>
+</tr>
+<tr>
+<td><code>All Sensor Groups included</code></td>
+<td>81.8</td>
+<td>71.5</td>
+</tr>
+</tbody>
+</table>
+<p>Based on the results found in this table, and with the limited data at hand, the reproduced architecture shows signs of identifying different driving styles. However, all reproduced results are lower compared to the original accuracies.</p>
+<p>Aside from the lack of data, the decrease in accuracy could be caused by the Triplet Margin Loss function. Throughout the experiments, we saw that the loss kept converging to the margin, rather than decreasing to zero. From this, we interpret that it is much more difficult to find an embedding that satisfies the inequality <span class="arithmatex">\(D_{rp}^{2} + \alpha &lt; D_{rp}^{2}\)</span>. This might be due to the way the architecture was implemented.</p>
+<h1 id="reference">Reference</h1>
+<p><a id="1">[1]</a>  Yang, J., Zhao, R., Zhu, M., Hallac, D., Sodnik, J., &amp; Leskovec, J. (2021). Driver2vec: Driver identification from automotive data. arXiv preprint arXiv:2102.05234.</p>
+<p><a id="2">[2]</a> Francesco, L. (2021). Temporal Convolutional Networks and Forecasting. https://unit8.com/resources/temporal-convolutional-networks-and-forecasting/</p>
+<p><a id="3">[3]</a> Bai, S., Kolter, J. Z., &amp; Koltun, V. (2018). An empirical evaluation of generic convolutional and recurrent networks for sequence modeling. arXiv preprint arXiv:1803.01271.</p>
+<p><a id="4">[4]</a> Haar Wavelets http://dsp-book.narod.ru/PWSA/8276_01.pdf</p>
+<p><a id="5">[5]</a> Good explanation and implementation (in Tensorflow) of the Triplet Loss: https://omoindrot.github.io/triplet-loss</p>
+<p><a id="6">[6]</a> What is LightGBM https://medium.com/@pushkarmandot/https-medium-com-pushkarmandot-what-is-lightgbm-how-to-implement-it-how-to-fine-tune-the-parameters-60347819b7fc</p>
+<p><a id="7">[7]</a> LightGBM’s documentation, Microsoft Corporation https://lightgbm.readthedocs.io/en/latest/</p>
+<p><a id="8">[8]</a> Ke, G., Meng, Q., Finley, T., Wang, T., Chen, W., Ma, W., ... &amp; Liu, T. Y. (2017). Lightgbm: A highly efficient gradient boosting decision tree. Advances in neural information processing systems, 30.</p></div>
+        
+        
+    </div>
+
+    
+      <footer class="col-md-12 text-center">
+          
+          
+            <hr>
+            <p>
+            <small>Documentation built with <a href="http://www.mkdocs.org/">MkDocs</a>.</small>
+            </p>
+          
+
+          
+          
+      </footer>
+    
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+    <script src="js/bootstrap-3.0.3.min.js"></script>
+
+    
+    <script src="//cdn.jsdelivr.net/gh/highlightjs/cdn-release@9.18.0/build/highlight.min.js"></script>
+        
+    <script>hljs.initHighlightingOnLoad();</script>
+    
+
+    <script>var base_url = "."</script>
+    
+    <script src="js/base.js"></script>
+    <script src="javascripts/mathjax.js"></script>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="search/main.js"></script>
+
+    <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="searchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">
+                    <span aria-hidden="true">&times;</span>
+                    <span class="sr-only">Close</span>
+                </button>
+                <h4 class="modal-title" id="searchModalLabel">Search</h4>
+            </div>
+            <div class="modal-body">
+                <p>
+                    From here you can search these documents. Enter
+                    your search terms below.
+                </p>
+                <form>
+                    <div class="form-group">
+                        <input type="text" class="form-control" placeholder="Search..." id="mkdocs-search-query" title="Type search term here">
+                    </div>
+                </form>
+                <div id="mkdocs-search-results"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div><div class="modal" id="mkdocs_keyboard_modal" tabindex="-1" role="dialog" aria-labelledby="keyboardModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="keyboardModalLabel">Keyboard Shortcuts</h4>
+                <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+            </div>
+            <div class="modal-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="width: 20%;">Keys</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="help shortcut"><kbd>?</kbd></td>
+                    <td>Open this help</td>
+                  </tr>
+                  <tr>
+                    <td class="next shortcut"><kbd>n</kbd></td>
+                    <td>Next page</td>
+                  </tr>
+                  <tr>
+                    <td class="prev shortcut"><kbd>p</kbd></td>
+                    <td>Previous page</td>
+                  </tr>
+                  <tr>
+                    <td class="search shortcut"><kbd>s</kbd></td>
+                    <td>Search</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+    </div>
+</div>
+    </body>
+
+</html>
+
+<!--
+MkDocs version : 1.3.0
+Build Date UTC : 2022-04-14 22:36:37.705072+00:00
+-->
