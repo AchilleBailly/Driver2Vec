@@ -87,13 +87,13 @@ Once we the embedding from the full architecture, we need a way to train the net
 
 $$ \mathbf{L}(x_{r},x_{p},x_{n})=\max(0,D_{rp}^{2} - D_{rn}^{2} + \alpha) $$
 
-Where $x_r, x_p, x_n$ are the embeddings for the anchor, positive and negative samples respectively, $D_{rp}$ (resp. $D_{rn}$) is the distance (usually euclidian) between the anchor and the positive embdeggings (resp. negative) and $\alpha$ is a positive number called the margin (often set to $1.0$).
+Where $x_r, x_p, x_n$ are the embeddings for the anchor, positive and negative samples respectively, $D_{rp}$ (resp. $D_{rn}$) is the distance (usually euclidean) between the anchor and the positive embeddings (resp. negative) and $\alpha$ is a positive number called the margin (often set to $1.0$).
 
-Essentially, it is trying to make sure that the following inequation is respected:
+Essentially, it is trying to make sure that the following inequality is respected:
 
 $$ D_{rp}^{2} + \alpha < D_{rp}^{2} $$
 
-With the available dataset being so limited, choosing the positive and negative samples for each anchor at random is probably enough. In most cases however, the most efficient way of choosing them is to pick the worst ones for each anchor (see [[5]](#5)), i.e. chossing the positive sample that is the farthest away and the negative one that is the closest. Again, for more detail on how to actually do that efficiently, go to the website referenced in [[5]](#5) for a very detailed explanation.
+With the available dataset being so limited, choosing the positive and negative samples for each anchor at random is probably enough. In most cases however, the most efficient way of choosing them is to pick the worst ones for each anchor (see [[5]](#5)), i.e. choosing the positive sample that is the farthest away and the negative one that is the closest. Again, for more detail on how to actually do that efficiently, go to the website referenced in [[5]](#5) for a very detailed explanation.
 
 
 ## Gradient Boosting Decision Trees (LightGBM)
