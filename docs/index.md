@@ -52,7 +52,7 @@ Figure 3. The residual module in TCN [[3]](#3)
 
 Driver2vec applied Haar wavelet transformation to generates two vectors in the frequency domain. Wavelet Transform decomposes a time series function into a set of wavelets. A Wavelet is an oscillation use to decompose the signal, which has two characteristics, scale and location. Large scale can capture low frequency information and conversely, small scale is designed for high frequency information. Location defines the time and space of the wavelet. 
 
-The essence of Wavelet Transform is to how much of a wavelet is in a signal for a particular scale and location. The process of Wavelet Transform consists of four steps: 
+The essence of Wavelet Transform is to measure how much of a wavelet is in a signal for a particular scale and location. The process of Wavelet Transform consists of four steps: 
 
 1. the wavelet moves across the entire signal with various location
 2. the coefficients of trend and fluctuation for at each time step is calculated use scalar product (in following equations)
@@ -76,13 +76,22 @@ $$ d_m = \frac{f_{2m-1} - f_{2m+1}}{\sqrt{2}}$$
 Figure 4. An example for Haar transform [[4]](#4)
 </center>
 
-### Triplet Margin Loss
+## Full architecture
 
-Once the output of the wavelet transform and the TCN are combined throught a Fully Connected layer to form the embedding, we need a way to train the network. With no ground truth to compare the output to, the *triplet margin loss* is used. At its core, this criterion pulls together the embeddings that are supposed to be close and pushes away the ones that are not. Mathematically, it is defined as follows:
+The two vectors that the wavelet transform outputs are then fed through a Fully Connected (FC) layer to map them to a 15 dimensional vector. Both of them are concatenated with the last output of the TCN and fed through a final FC layer with Batch Normalization and a sigmoid activation function to get our final embedding. 
 
-$$ \bold{L}(x_{r},x_{p},x_{n})=max(0,D_{rp}^{2} + D_{rp}^{2} + \alpha) $$
 
-Where $x_{r,p,n}$ are the embeddings for the anchor, positive and negative samples respectively, $D_{rp}$ (resp. $D_{rn}$) is the distance (usually euclidian) between the anchor and the positive embdeggings (resp. negative) and $\alpha$ is a positive number called the margin.
+## Triplet Margin Loss
+
+Once we the embedding from the full architecture, we need a way to train the network. With no ground truth to compare the output to, the *triplet margin loss* is used. At its core, this criterion pulls together the embeddings that are supposed to be close and pushes away the ones that are not. Mathematically, it is defined as follows:
+
+$$ \textbf{L}(x_{r},x_{p},x_{n})=max(0,D_{rp}^{2} + D_{rp}^{2} + \alpha) $$
+
+Where $x_{r,p,n}$ are the embeddings for the anchor, positive and negative samples respectively, $D_{rp}$ (resp. $D_{rn}$) is the distance (usually euclidian) between the anchor and the positive embdeggings (resp. negative) and $\alpha$ is a positive number called the margin (often set to $1.0$).
+
+Essentially, it is trying to make sure that the following inequation is respected:
+
+$$ D_{rp}^{2} + \alpha \less D_{rp}^{2}
 
 With the available dataset being so limited, choosing the positive and negative samples for each anchor at random is probably enough. In most cases however, the most efficient way of choosing them is to pick the worst ones for each anchor (see [[5]](#5)), i.e. chossing the positive sample that is the farthest away and the negative one that is the closest. Again, for more detail on how to actually do that efficiently, go to the website referenced in [[5]](#5) for a very detailed explanation.
 
