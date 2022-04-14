@@ -95,6 +95,8 @@ $$ D_{rp}^{2} + \alpha < D_{rp}^{2} $$
 
 With the available dataset being so limited, choosing the positive and negative samples for each anchor at random is probably enough. In most cases however, the most efficient way of choosing them is to pick the worst ones for each anchor (see [[5]](#5)), i.e. choosing the positive sample that is the farthest away and the negative one that is the closest. Again, for more detail on how to actually do that efficiently, go to the website referenced in [[5]](#5) for a very detailed explanation.
 
+In the end, we chose to implement the "hard" triplet loss as we thought it might resolve the issues we faced.
+
 
 ## Gradient Boosting Decision Trees (LightGBM)
 Before introducing Light GBM, we first illustrate what is boosting and how it can work. The goal of boosting is improving the prediction power converting weak learners into strong learners. The basic logit is to build a model on the training dataset, and then build the next model to rectify the errors present in the previous one. In this procedure, weights of observations are updates according to the rule that wrongly classified observations would have increasing weights. So, only those misclassified observations get selected in the next model and the procedure iterate until the errors are minimized.
@@ -244,6 +246,7 @@ After reconstructing the Driver2Vec architecture, we let this model train on the
 | `All Sensor Groups included` | 81.8                           | 71.5                  |
 
 Based on the results found in this table, and with the limited data at hand, the reproduced architecture shows signs of identifying different driving styles. However, all reproduced results are lower compared to the original accuracies.
+
 
 Aside from the lack of data, the decrease in accuracy could be caused by the Triplet Margin Loss function. Throughout the experiments, we saw that the loss kept converging to the margin, rather than decreasing to zero. From this, we interpret that it is much more difficult to find an embedding that satisfies the inequality $D_{rp}^{2} + \alpha < D_{rp}^{2}$. This might be due to the way the architecture was implemented.
 

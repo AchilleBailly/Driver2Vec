@@ -11,14 +11,17 @@ import torch.nn as nn
 from torch.nn.utils import weight_norm
 from torch.utils.data import DataLoader
 from tqdm.notebook import tqdm
+import itertools as itt
+from scenarios import *
+
 
 use_cuda = torch.cuda.is_available()
-device = torch.device("cuda" if use_cuda else "cpu")
+device = torch.device("cuda:0" if use_cuda else "cpu")
 #torch.backends.cudnn.benchmark = True
 
 
 # %% [markdown]
-## Temporal Convolution Network
+# Temporal Convolution Network
 
 # The following classes implement the TCN as explained in the paper ["Temporal Convolutional Networks: A Unified Approach to Action Segmentation"](https://link.springer.com/chapter/10.1007/978-3-319-49409-8_7).
 
@@ -85,15 +88,15 @@ class TemporalBlock(nn.Module):
         self.init_weights()
 
     def init_weights(self):
-        nn.init.xavier_uniform(self.conv1.weight)
-        nn.init.xavier_uniform(self.conv2.weight)
+        nn.init.xavier_uniform_(self.conv1.weight)
+        nn.init.xavier_uniform_(self.conv2.weight)
         if self.downsample is not None:
-            nn.init.xavier_uniform(self.downsample.weight)
+            nn.init.xavier_uniform_(self.downsample.weight)
 
     def forward(self, x):
         out = self.net(x)
         res = x if self.downsample is None else self.downsample(x)
-        return self.relu(out + res)
+        return out + res
 
 
 class TemporalConvNet(nn.Module):
@@ -122,9 +125,9 @@ class TemporalConvNet(nn.Module):
         return self.network(x)
 
 # %% [markdown]
-## Haar Wavelet Transorm
+# Haar Wavelet Transorm
 
-#The following two blocks implement the second part of the Driver2Vec architecture, related to the Haar wavelet transorm. Its aim is to capture spectral components of the inputs.
+# The following two blocks implement the second part of the Driver2Vec architecture, related to the Haar wavelet transorm. Its aim is to capture spectral components of the inputs.
 
 # %%
 
@@ -132,10 +135,10 @@ class TemporalConvNet(nn.Module):
 def reference_transform(tensor):
     """
     Apply the Haar wavelet transform to a tensor
-    
+
     input:
         tensor: a tensor with dimension (N, C, L), with N batch size, C number of channels and L the input length
-    
+
     output:
         a tensor with dimensions (N, C, L) where the the two output channels of the transform are concatenated along the L dimension
     """
@@ -194,9 +197,9 @@ class WaveletPart(nn.Module):
         return torch.cat((x1, x2), -1)
 
 # %% [markdown]
-## Full architecture
+# Full architecture
 
-#The following class implements the full architecture of Driver2Vec
+# The following class implements the full architecture of Driver2Vec
 # %%
 
 
@@ -247,29 +250,30 @@ class Driver2Vec(nn.Module):
         if self.wavelet:
             y2 = self.haar(input_haar)
 
-            out = torch.cat((y1, y2), dim=1)
+            out = torch.cat((y1, y2), 1)
         else:
             out = y1
-        bsize = out.shape[0]
+        # bsize = out.shape[0]
 
-        if bsize > 1:  # issue when the batch size is 1, can't batch normalize it
-            out = self.input_bn(out)
-        else:
-            out = out
-        out = self.linear(out)
+        # if bsize > 1:  # issue when the batch size is 1, can't batch normalize it
+        #     out = self.input_bn(out)
+        # else:
+        #     out = out
+        # out = self.linear(out)
         out = self.activation(out)
 
-        if print_temp:
-            print(out)
+        # if print_temp:
+        #     print(out)
 
         return out
 
 # %% [markdown]
 
-## Hard Triplet Loss
+# Hard Triplet Loss
 
 # The following class implements the hard triplet loss. Hard means that the closest negative and furthest positive are choosen instead of random.
 # %%
+
 
 class HardTripletLoss():
 
@@ -288,7 +292,7 @@ class HardTripletLoss():
         return res
 
     def _get_dist_matrix(self, embeddings):
-        return torch.cdist(embeddings, embeddings).to(self.device)
+        return torch.cdist(embeddings, embeddings).to(self.device)**2
 
     def __call__(self, embeddings, labels):
         """Build the triplet loss over a batch of embeddings.
@@ -340,13 +344,13 @@ class HardTripletLoss():
         return triplet_loss
 
 # %% [markdown]
-## Datasets
+# Datasets
 
 # The following 3 classes are used to handle the dataset that we have.
 # %%
 
 
-def preprocess(df):
+def preprocess(df, to_drop):
     return (
         df.drop(
             ["FOG",
@@ -356,19 +360,19 @@ def preprocess(df):
              "RAIN",
              "REAR_WIPERS",
              "SNOW",
-             ], axis=1
+             ] + to_drop, axis=1
         )
     )
 
 
-class TrainDataset(torch.utils.data.Dataset):
+class Dataset(torch.utils.data.Dataset):
     """
     This class is used to handle the train dataset to work witht the Triplet Loss.
     The __getitem__ method (to be used with a dataloader) returns the anchor, a random postive and a random negative for that anchor
     as well as the anchor's label.
     """
 
-    def __init__(self, data, labels, input_length=500):
+    def __init__(self, data, labels, input_length):
         self.data, self.labels = data, labels
         self.index = [i for i in range(len(self.data))]
         self.length = input_length
@@ -377,98 +381,121 @@ class TrainDataset(torch.utils.data.Dataset):
         return len(self.data)
 
     def __getitem__(self, index):
-        max_length = self.data[index].shape[1]
-        # int(np.random.uniform(0, max_length - self.length+1))
-        start_pos_anchor = int(np.random.uniform(0, max_length - self.length+1))
-        X_anchor = self.data[index][:,
-                                    start_pos_anchor:start_pos_anchor+self.length]
-        anchor_wvlt = reference_transform(X_anchor)
+        X_anchor = self.data[index]
         y_anchor = self.labels[index]
+
+        anchor_wvlt = reference_transform(X_anchor)
 
         # concatenate the data for the TCN and the haar wavelet transform
         # they will be split in the forward pass
         return torch.cat((X_anchor, anchor_wvlt), 1), \
             y_anchor
 
+    @torch.no_grad()
+    def get_classifier_data(self, labels_list, model: nn.Module):
+        data = []
+        labels = []
+        device = torch.device("cuda:0")
 
-class TestDataset(torch.utils.data.Dataset):
-    """
-    Is to be used with Dataloader for testing only
-    """
+        index_list = [i for i in self.index if self.labels[i] in labels_list]
 
-    def __init__(self, data, labels):
-        self.data = data
-        self.labels = labels
+        for i in index_list:
+            anchor = self[i][0].unsqueeze(0)
+            anchor = anchor.to(device)
+            embed = model(anchor)
 
-    def __len__(self):
-        return len(self.data)
+            data.append(embed.cpu().detach().numpy().squeeze())
+            labels.append(labels_list.index(self.labels[i]))
 
-    def __getitem__(self, index):
-        x = self.data[index]
-        wvlt = reference_transform(x)
-        out = torch.cat((x, wvlt), 1)
-        return out, self.labels[index]
+        data = np.array(data)
+        return data, labels
 
 
 class FromFiles:
     """
     Used to load the data from the files and split between test and train sets
+    Also segments the 1000-length inputs as suggested in the original paper
     """
 
-    def __init__(self, input_dir, input_length):
-        self.input_dir = input_dir
+    def __init__(self, input_dir, input_length, columns_to_drop, seg_offset=40):
         self.input_length = input_length
+        self.seg_offset = seg_offset
 
-        self.data, self.labels = self.__load_dataset()
-        self.index = [i for i in range(len(self.data))]
+        self.raw_data, self.raw_labels = self._load_dataset(
+            input_dir, columns_to_drop)
+        self.seg_data, self.seg_labels = self._segment(
+            input_length, seg_offset)
+        self.index = [i for i in range(len(self.seg_data))]
 
-    def __load_dataset(self):
+    def _load_dataset(self, input_dir, columns_to_drop):
         x = []
         y = []
-        for dir, _, files in os.walk(self.input_dir):
+        for dir, _, files in os.walk(input_dir):
             for file in files:
                 label = int(file.split("_")[1])-1
                 df = pd.read_csv(dir + "/" + file, index_col=0)
-                df = preprocess(df).to_numpy().transpose()
-                x.append(torch.from_numpy(df).float())
+                df = preprocess(df, columns_to_drop).to_numpy().transpose()
+                x.append(torch.from_numpy(df).float()+1e-8)
                 y.append(label)
         return x, y
 
-    def split_train_test(self):
+    def _segment(self, input_length, offset):
+        new_data, new_labels = [], []
+        for i in range(len(self.raw_data)):
+            cur_offset = 0
+            data = self.raw_data[i].clone()
+            label = self.raw_labels[i]
+            while cur_offset + input_length < 1000:
+                new_data.append(data[:, cur_offset:cur_offset+input_length])
+                new_labels.append(label)
+                cur_offset += offset
+
+        return new_data, new_labels
+
+    def split_train_test(self, ratio=0.8):
         x_test, y_test = [], []
+        x_train, y_train = [], []
+
         for label in range(5):
-            possible_list = [i for i in self.index if self.labels[i] == label]
-            choosen_index = np.random.choice(possible_list)
+            possible_list = [
+                i for i in self.index if self.seg_labels[i] == label]
+            number_to_select = int(len(possible_list)*ratio)
+            train_list = set(np.random.choice(
+                possible_list, number_to_select, replace=False))
+            test_list = set(possible_list)-train_list
 
-            positive = self.data[choosen_index]
-            max_length = positive.shape[1]
-            train, test = torch.split(
-                positive, [max_length-self.input_length, self.input_length], dim=1)
+            for i in train_list:
+                x_train.append(self.seg_data[i])
+            for i in test_list:
+                x_test.append(self.seg_data[i])
 
-            x_test.append(test)
-            y_test.append(label)
-            self.data[choosen_index] = train
+            y_train += [label] * len(train_list)
+            y_test += [label] * len(test_list)
 
-        return self.data, self.labels, x_test, y_test
+        return x_train, y_train, x_test, y_test
 
 # %% [markdown]
 
-## Custom Dataloader
+# Custom Dataloader
 
 # This custom dataset is useful to load bigger batches than the 19 sample sequences that we have.
 # %%
+
+
 class Dataloader():
     """Homemade dataloader for our needs in training
     This is different from the other one as it allows for "infinite" batches, even when the data only has 
     19 points. When setting bacht_size*number_batches bigger that the total number of points in the dataset,
     this dataloader will just loop again from the beginning."""
 
-    def __init__(self, dataset: TrainDataset, batch_size: int, number_batch: int, shuffle=True):
+    def __init__(self, dataset: Dataset, batch_size: int, shuffle=True, number_batch=None):
         self.dataset = dataset
         self.b_size = batch_size
         self.n_batches = number_batch
         self.current_batch = 0
         self.shuffle = shuffle
+        if number_batch == None:
+            self.n_batches = len(self.dataset)//batch_size
 
     def __iter__(self):
         self.current_batch = 0
@@ -497,144 +524,72 @@ class Dataloader():
             self.current_batch = 0
             raise StopIteration
 
-#%% [markdown]
-## The model
+# %% [markdown]
+# The model
 
-#The following code is the Driver2Vec model setup.
+# The following code is the Driver2Vec model setup.
+
 
 # %%
-input_channels = 31
-input_length = 300
-channel_sizes = [25,25]
-output_size = 62
-kernel_size = 16
-dropout = 0.1
-model = Driver2Vec(input_channels, input_length, channel_sizes, output_size,
-                   kernel_size=kernel_size, dropout=dropout, do_wavelet=False)
-model.to(device)
+def get_model(input_channels):
+    model = Driver2Vec(input_channels, INPUT_LENGTH, CHANNELS_SIZES, OUTPUT_SIZE,
+                       kernel_size=KERNEL_SIZE, dropout=DROPOUT, do_wavelet=True)
+    model.to(device)
+    return model
 
-#%% [markdown]
-
-#Next are the dataloader, loss and optimizer.
-
-# %%
-
-# # datasets parameters
-# params = {'batch_size': 4,
-#           'shuffle': True,
-#           'num_workers': 1}
-
-
-fromfiles = FromFiles("./dataset", input_length)
-x_train, y_train, x_test, y_text = fromfiles.split_train_test()
-training_set = TrainDataset(x_train, y_train, input_length)
-training_generator = Dataloader(training_set, 20, 4)
-
-loss = HardTripletLoss(device, margin=0.5)
-optimizer = torch.optim.Adam(model.parameters(), lr=0.004, weight_decay=0.0001)
-
-#%% [markdown]
-
-# Finally, here is the training loop.
-# %%
-epochs = 50
-
-
-model.train()
-for epoch in (pbar := tqdm(range(epochs))):
-    loss_list = []
-    for anchor, label in training_generator:
-        anchor = anchor.to(device)
-
-        optimizer.zero_grad()
-
-        y_anchor = model(anchor)
-
-        loss_value = loss(y_anchor, label)
-        loss_value.backward()
-
-        optimizer.step()
-
-        loss_list.append(loss_value.cpu().detach().numpy())
-    #print("Epoch: {}/{} - Loss: {:.4f}".format(epoch+1, epochs, np.mean(loss_list)))
-    pbar.set_description("Loss: %0.5g, Epochs" % (np.mean(loss_list)))
 
 # %% [markdown]
 
-## LightGBM classifier
+# LightGBM classifier
 
-#The following is the setup and the training of the LightGBM classifier.
+# The following is the setup and the training of the LightGBM classifier.
 # %%
 
-params1 = {'batch_size': 19,
-           'shuffle': False,
-           'num_workers': 2}
 
-params2 = {'batch_size': 38,
-           'shuffle': False,
-           'number_batch': 1}
+def get_n_way_accuracy(n_way, test_dataset, train_dataset, model):
+    params = {
+        'boosting_type': 'gbdt',
+        'objective': 'multiclass',
+        'num_class': n_way,
+        'metric': 'multi_logloss',
+        'num_leaves': 32,
+        'feature_fraction': 0.8,
+        'bagging_fraction': 0.9,
+        'max_depth': 8,
+        'num_trees': 30,
+        'verbose': 0,
+        'min_data_in_leaf': 2,  # May need to change that with a real test set
+        'verbose': -1
+    }
 
-classifier_train_set = TrainDataset(x_test, y_text, input_length)
-classifier_train_generator = DataLoader(training_set, **params1)
+    model.eval()
 
-x_train_classifier = []
-y_train_classifier = []
-model.train(False)
-for data, label in classifier_train_generator:
-    data = data.to(device)
-    embed = model(data)
+    l = [0, 1, 2, 3, 4]
+    accuracies = []
 
+    for driver_list in itt.combinations(l, n_way):
 
-for i in range(5):
-    x_train_classifier.append(embed[i, :].cpu().detach().numpy().squeeze())
-    y_train_classifier.append(int(label[i]))
+        x_train_classifier, y_train_classifier = train_dataset.get_classifier_data(driver_list,
+                                                                                   model)
+        x_test_class, y_test_class = test_dataset.get_classifier_data(
+            driver_list, model)
+        lgb_train = lgbm.Dataset(x_train_classifier, y_train_classifier, params={
+                                 'verbose': -1}, free_raw_data=False)
 
-x_train_classifier = np.array(x_train_classifier)
-y_train_classifier = np.array(y_train_classifier)
+        clf = lgbm.train(params, lgb_train)
 
-lgb_train = lgbm.Dataset(x_train_classifier, y_train_classifier)
+        pred = clf.predict(x_test_class)
 
-params = {
-    'boosting_type': 'gbdt',
-    'objective': 'multiclass',
-    'num_class': 5,
-    'metric': 'multi_logloss',
-    'num_leaves': 32,
-    'feature_fraction': 0.8,
-    'bagging_fraction': 0.9,
-    'max_depth': 8,
-    'num_trees': 30,
-    'verbose': 0,
-    'min_data_in_leaf': 2  # May need to change that with a real test set
-}
+        binar_pred = [0 if pred[index][truth] <
+                      0.5 else 1 for index, truth in enumerate(y_test_class)]
+        accuracies.append(np.mean(binar_pred))
 
-clf = lgbm.train(params, lgb_train)
+    return np.mean(accuracies)
+
 
 # %% [markdown]
 
 # Testing the classifier on the test set we made and also a part of the training set to evaluate it.
-# %%
-params = {'batch_size': 5,
-          'shuffle': False,
-          'num_workers': 1}
-
-classifier_test_set = TestDataset(x_test, y_text)
-classifier_test_generator = DataLoader(classifier_test_set, **params)
-
-x_test_classifier = []
-y_test_classifier = []
-for data, label in classifier_test_generator:
-    data = data.to(device)
-    embed = model(data)
-
-
-for i in range(5):
-    x_test_classifier.append(embed[i, :].cpu().detach().numpy().squeeze())
-    y_test_classifier.append(int(label[i]))
-
-
-y_pred = clf.predict(x_test_classifier)
-print(y_pred, y_test_classifier)
 
 # %%
 
@@ -648,62 +603,75 @@ def distance_matrix(tensor: torch.Tensor):
     return res
 
 
-# %%
-params = {"batch_size": 19,
-          "shuffle": False,
-          "num_workers": 1}
+# %% [markdown]
 
-generator = DataLoader(training_set, **params)
-x_test_classifier = []
-y_test_classifier = []
-for data, label in generator:
-    data = data.to(device)
-    embed = model(data)
-
-
-for i in range(19):
-    x_test_classifier.append(embed[i, :].cpu().detach().numpy().squeeze())
-    y_test_classifier.append(int(label[i]))
-
-
-y_pred = clf.predict(x_test_classifier)
-print(y_pred, y_test_classifier)
-
-#%% [markdown]
-
-## T-SNE visualisation
+# T-SNE visualisation
 
 # As in the original paper, we us t-SNE to visualise the embeddings. It can help to spot the issues in the model.
+# %%
+def show_TSNE(model, training_set):
+    params = {'batch_size': 60,
+              'shuffle': True,
+              'number_batch': 1}
+
+    generator = Dataloader(training_set, **params)
+    x_tsne = []
+    y_tsne = []
+    for data, label in generator:
+        data = data.to(device)
+        embed = model(data)
+
+    print(embed.shape)
+
+    for i in range(embed.shape[0]):
+        x_tsne.append(embed[i, :].cpu().detach().numpy().squeeze())
+        y_tsne.append(int(label[i]))
+
+    X_emb = TSNE(n_components=2, perplexity=60, n_iter=10000,
+                 verbose=True).fit_transform(embed)
+
+    plt.scatter(X_emb[:, 0], X_emb[:, 1], marker="+", c=y_tsne)
+    plt.show()
 
 # %%
 
-params = {'batch_size': 60,
-          'shuffle': False,
-          'number_batch': 1}
 
-generator = Dataloader(training_set, **params)
-x_tsne = []
-y_tsne = []
-for data, label in generator:
-    data = data.to(device)
-    embed = model(data)
+if __name__ == "__main__":
+    out_file = open("out_files.txt", "wt")
+    for group_to_drop in COLUMN_SELECTION_SPECS:
 
-print(embed.shape)
+        to_drop = COLUMN_GROUPS[group_to_drop]
 
-for i in range(embed.shape[0]):
-    x_tsne.append(embed[i, :].cpu().detach().numpy().squeeze())
-    y_tsne.append(int(label[i]))
+        fromfiles = FromFiles("./dataset", INPUT_LENGTH, to_drop)
+        x_train, y_train, x_test, y_text = fromfiles.split_train_test()
+        training_set = Dataset(x_train, y_train, INPUT_LENGTH)
+        test_set = Dataset(x_test, y_text, INPUT_LENGTH)
+        training_generator = Dataloader(training_set, BATCH_SIZE)
 
+        model = get_model(x_train[0].shape[0])
+        loss = HardTripletLoss(device, margin=1)
+        optimizer = torch.optim.Adam(
+            model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
 
-# %%
+        for epoch in (pbar := tqdm(range(EPOCHS))):
+            loss_list = []
+            for anchor, label in training_generator:
+                anchor = anchor.to(device)
 
-X_emb = TSNE(n_components=2, perplexity=60, n_iter=10000,
-             verbose=True).fit_transform(embed)
+                optimizer.zero_grad()
 
+                y_anchor = model(anchor)
 
-# %%
+                loss_value = loss(y_anchor, label)
+                loss_value.backward()
 
-plt.scatter(X_emb[:, 0], X_emb[:, 1], marker="+", c=y_tsne)
-plt.show()
+                optimizer.step()
 
-# %%
+                loss_list.append(loss_value.cpu().detach().numpy())
+            #print("Epoch: {}/{} - Loss: {:.4f}".format(epoch+1, epochs, np.mean(loss_list)))
+            pbar.set_description("Loss: %0.5g, Epochs" % (np.mean(loss_list)))
+
+        acc = get_n_way_accuracy(2, test_set, training_set, model)
+        print(acc)
+        out_file.write(f"Group dropped: {group_to_drop}; Accuracy: {acc}\n")
+    out_file.close()
