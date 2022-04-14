@@ -245,8 +245,8 @@ After reconstructing the Driver2Vec architecture, we let this model train on the
 | `Turn indicators`            | 79.3                           | 64.7                  |
 | `All Sensor Groups included` | 81.8                           | 71.5                  |
 
+Based on the results found in this table, and with the limited data at hand, the reproduced architecture shows signs of identifying different driving styles. However, all reproduced results are lower compared to the original accuracies.
 
-Based on the results found in Table \ref{fig:ablation}, and with the limited data at hand, the reproduced architecture shows signs of identifying different driving styles. However, all reproduced results are lower compared to the original accuracies.
 
 Aside from the lack of data, the decrease in accuracy could be caused by the Triplet Margin Loss function. Throughout the experiments, we saw that the loss kept converging to the margin, rather than decreasing to zero. From this, we interpret that it is much more difficult to find an embedding that satisfies the inequality $D_{rp}^{2} + \alpha < D_{rp}^{2}$. This might be due to the way the architecture was implemented.
 
