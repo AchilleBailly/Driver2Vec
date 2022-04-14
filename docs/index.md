@@ -91,7 +91,7 @@ Where $x_{r,p,n}$ are the embeddings for the anchor, positive and negative sampl
 
 Essentially, it is trying to make sure that the following inequation is respected:
 
-$$ D_{rp}^{2} + \alpha \less D_{rp}^{2}
+$$ D_{rp}^{2} + \alpha \less D_{rp}^{2} $$
 
 With the available dataset being so limited, choosing the positive and negative samples for each anchor at random is probably enough. In most cases however, the most efficient way of choosing them is to pick the worst ones for each anchor (see [[5]](#5)), i.e. chossing the positive sample that is the farthest away and the negative one that is the closest. Again, for more detail on how to actually do that efficiently, go to the website referenced in [[5]](#5) for a very detailed explanation.
 

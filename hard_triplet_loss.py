@@ -16,27 +16,11 @@ use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 #torch.backends.cudnn.benchmark = True
 
-# %% [markdown]
-# ## Wavelet transform
-
-# %%
-
-
-def van_haar(data):
-    ncol = data.shape[1]
-    nrow = data.shape[0]
-    for i in range(ncol):
-        cur_col = data[:, i].copy()
-        (cA, cD) = pywt.dwt(cur_col, 'haar')
-        new_col = np.reshape(np.concatenate((cA, cD), 0), (nrow, 1))
-        data = np.hstack((data, new_col))
-    data = data.reshape(nrow, -1)
-    return data
-
-# van_haar(test.to_numpy()).shape
 
 # %% [markdown]
-# ## PyTorch
+## Temporal Convolution Network
+
+# The following classes implement the TCN as explained in the paper ["Temporal Convolutional Networks: A Unified Approach to Action Segmentation"](https://link.springer.com/chapter/10.1007/978-3-319-49409-8_7).
 
 # %%
 
@@ -137,10 +121,24 @@ class TemporalConvNet(nn.Module):
         # this is the same as input dims for the nn.Conv1d
         return self.network(x)
 
+# %% [markdown]
+## Haar Wavelet Transorm
+
+#The following two blocks implement the second part of the Driver2Vec architecture, related to the Haar wavelet transorm. Its aim is to capture spectral components of the inputs.
+
 # %%
 
 
 def reference_transform(tensor):
+    """
+    Apply the Haar wavelet transform to a tensor
+    
+    input:
+        tensor: a tensor with dimension (N, C, L), with N batch size, C number of channels and L the input length
+    
+    output:
+        a tensor with dimensions (N, C, L) where the the two output channels of the transform are concatenated along the L dimension
+    """
     array = tensor.numpy()
     out1, out2 = pywt.dwt(array, "haar")
     out1 = torch.from_numpy(out1)
@@ -153,8 +151,17 @@ def reference_transform(tensor):
 
 # %%
 class WaveletPart(nn.Module):
+    """
+    Module to map the (N, C, L) output of the Haar transform to a (N, 2*O) tensor
+    """
 
     def __init__(self, input_length, input_size, output_size):
+        """
+        inputs:
+            input_length: length of the initial sequence fed to the network
+            input_size: size of the inputs of the FC layer 
+            output_size: output size of the FC layer
+        """
         super(WaveletPart, self).__init__()
 
         # used two different layers here as in the paper but in the github code, they are the same
@@ -186,6 +193,10 @@ class WaveletPart(nn.Module):
         x2 = x2.reshape(bsize, -1)
         return torch.cat((x1, x2), -1)
 
+# %% [markdown]
+## Full architecture
+
+#The following class implements the full architecture of Driver2Vec
 # %%
 
 
@@ -222,7 +233,7 @@ class Driver2Vec(nn.Module):
 
     def forward(self, inputs, print_temp=False):
         """Inputs have to have dimension (N, C_in, L_in*2)
-        the base time series, and the two wavelet transform channel are concatenated along dim2"""
+        the base time series, and the two wavelet transform channel are concatenated along the third dim"""
 
         # split the inputs, in the last dim, first is the unchanged data, then
         # the wavelet transformed data
@@ -253,8 +264,12 @@ class Driver2Vec(nn.Module):
 
         return out
 
-# %%
+# %% [markdown]
 
+## Hard Triplet Loss
+
+# The following class implements the hard triplet loss. Hard means that the closest negative and furthest positive are choosen instead of random.
+# %%
 
 class HardTripletLoss():
 
@@ -324,7 +339,10 @@ class HardTripletLoss():
 
         return triplet_loss
 
+# %% [markdown]
+## Datasets
 
+# The following 3 classes are used to handle the dataset that we have.
 # %%
 
 
@@ -344,10 +362,13 @@ def preprocess(df):
 
 
 class TrainDataset(torch.utils.data.Dataset):
-    'Characterizes a dataset for PyTorch'
+    """
+    This class is used to handle the train dataset to work witht the Triplet Loss.
+    The __getitem__ method (to be used with a dataloader) returns the anchor, a random postive and a random negative for that anchor
+    as well as the anchor's label.
+    """
 
     def __init__(self, data, labels, input_length=500):
-        'Initialization'
         self.data, self.labels = data, labels
         self.index = [i for i in range(len(self.data))]
         self.length = input_length
@@ -430,7 +451,11 @@ class FromFiles:
 
         return self.data, self.labels, x_test, y_test
 
+# %% [markdown]
 
+## Custom Dataloader
+
+# This custom dataset is useful to load bigger batches than the 19 sample sequences that we have.
 # %%
 class Dataloader():
     """Homemade dataloader for our needs in training
@@ -472,6 +497,10 @@ class Dataloader():
             self.current_batch = 0
             raise StopIteration
 
+#%% [markdown]
+## The model
+
+#The following code is the Driver2Vec model setup.
 
 # %%
 input_channels = 31
@@ -483,6 +512,10 @@ dropout = 0.1
 model = Driver2Vec(input_channels, input_length, channel_sizes, output_size,
                    kernel_size=kernel_size, dropout=dropout, do_wavelet=False)
 model.to(device)
+
+#%% [markdown]
+
+#Next are the dataloader, loss and optimizer.
 
 # %%
 
@@ -500,6 +533,9 @@ training_generator = Dataloader(training_set, 20, 4)
 loss = HardTripletLoss(device, margin=0.5)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.004, weight_decay=0.0001)
 
+#%% [markdown]
+
+# Finally, here is the training loop.
 # %%
 epochs = 50
 
@@ -523,6 +559,11 @@ for epoch in (pbar := tqdm(range(epochs))):
     #print("Epoch: {}/{} - Loss: {:.4f}".format(epoch+1, epochs, np.mean(loss_list)))
     pbar.set_description("Loss: %0.5g, Epochs" % (np.mean(loss_list)))
 
+# %% [markdown]
+
+## LightGBM classifier
+
+#The following is the setup and the training of the LightGBM classifier.
 # %%
 
 params1 = {'batch_size': 19,
@@ -569,6 +610,9 @@ params = {
 
 clf = lgbm.train(params, lgb_train)
 
+# %% [markdown]
+
+# Testing the classifier on the test set we made and also a part of the training set to evaluate it.
 # %%
 params = {'batch_size': 5,
           'shuffle': False,
@@ -624,6 +668,12 @@ for i in range(19):
 
 y_pred = clf.predict(x_test_classifier)
 print(y_pred, y_test_classifier)
+
+#%% [markdown]
+
+## T-SNE visualisation
+
+# As in the original paper, we us t-SNE to visualise the embeddings. It can help to spot the issues in the model.
 
 # %%
 
