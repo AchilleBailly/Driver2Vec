@@ -1,4 +1,5 @@
 # %%
+from cmath import nan
 import matplotlib.pyplot as plt
 from tsne_torch import TorchTSNE as TSNE
 import lightgbm as lgbm
@@ -11,14 +12,18 @@ import torch.nn as nn
 from torch.nn.utils import weight_norm
 from torch.utils.data import DataLoader
 from tqdm.notebook import tqdm
+from math import nan
+
+from haar_part_other_group import HaarWavelet
+
 
 use_cuda = torch.cuda.is_available()
-device = torch.device("cuda" if use_cuda else "cpu")
+device = torch.device("cuda:0" if use_cuda else "cpu")
 #torch.backends.cudnn.benchmark = True
 
 
 # %% [markdown]
-## Temporal Convolution Network
+# Temporal Convolution Network
 
 # The following classes implement the TCN as explained in the paper ["Temporal Convolutional Networks: A Unified Approach to Action Segmentation"](https://link.springer.com/chapter/10.1007/978-3-319-49409-8_7).
 
@@ -85,15 +90,15 @@ class TemporalBlock(nn.Module):
         self.init_weights()
 
     def init_weights(self):
-        nn.init.xavier_uniform(self.conv1.weight)
-        nn.init.xavier_uniform(self.conv2.weight)
+        nn.init.kaiming_uniform_(self.conv1.weight)
+        nn.init.kaiming_uniform_(self.conv2.weight)
         if self.downsample is not None:
-            nn.init.xavier_uniform(self.downsample.weight)
+            nn.init.kaiming_uniform_(self.downsample.weight)
 
     def forward(self, x):
         out = self.net(x)
         res = x if self.downsample is None else self.downsample(x)
-        return self.relu(out + res)
+        return out + res
 
 
 class TemporalConvNet(nn.Module):
@@ -122,9 +127,9 @@ class TemporalConvNet(nn.Module):
         return self.network(x)
 
 # %% [markdown]
-## Haar Wavelet Transorm
+# Haar Wavelet Transorm
 
-#The following two blocks implement the second part of the Driver2Vec architecture, related to the Haar wavelet transorm. Its aim is to capture spectral components of the inputs.
+# The following two blocks implement the second part of the Driver2Vec architecture, related to the Haar wavelet transorm. Its aim is to capture spectral components of the inputs.
 
 # %%
 
@@ -132,10 +137,10 @@ class TemporalConvNet(nn.Module):
 def reference_transform(tensor):
     """
     Apply the Haar wavelet transform to a tensor
-    
+
     input:
         tensor: a tensor with dimension (N, C, L), with N batch size, C number of channels and L the input length
-    
+
     output:
         a tensor with dimensions (N, C, L) where the the two output channels of the transform are concatenated along the L dimension
     """
@@ -174,10 +179,8 @@ class WaveletPart(nn.Module):
         self.haar = reference_transform
 
     def init_weight(self):
-        self.fc1.weight.data.normal_(0, 0.01)
-        self.fc1.bias.data.normal_(0, 0.01)
-        self.fc2.weight.data.normal_(0, 0.01)
-        self.fc2.bias.data.normal_(0, 0.01)
+        nn.init.kaiming_uniform_(self.fc1)
+        nn.init.kaiming_uniform_(self.fc2)
 
     def forward(self, x):
         # split the wavelet transformed data along third dim
@@ -194,9 +197,9 @@ class WaveletPart(nn.Module):
         return torch.cat((x1, x2), -1)
 
 # %% [markdown]
-## Full architecture
+# Full architecture
 
-#The following class implements the full architecture of Driver2Vec
+# The following class implements the full architecture of Driver2Vec
 # %%
 
 
@@ -247,16 +250,16 @@ class Driver2Vec(nn.Module):
         if self.wavelet:
             y2 = self.haar(input_haar)
 
-            out = torch.cat((y1, y2), dim=1)
+            out = torch.cat((y1, y2), 1)
         else:
             out = y1
-        bsize = out.shape[0]
 
+        bsize = out.shape[0]
         if bsize > 1:  # issue when the batch size is 1, can't batch normalize it
             out = self.input_bn(out)
         else:
             out = out
-        out = self.linear(out)
+        #out = self.linear(out)
         out = self.activation(out)
 
         if print_temp:
@@ -266,81 +269,13 @@ class Driver2Vec(nn.Module):
 
 # %% [markdown]
 
-## Hard Triplet Loss
+# Hard Triplet Loss
 
 # The following class implements the hard triplet loss. Hard means that the closest negative and furthest positive are choosen instead of random.
-# %%
 
-class HardTripletLoss():
-
-    def __init__(self, device, margin=1.0):
-        self.margin = margin
-        self.device = device
-
-    def _get_anchor_positive_triplet_mask(self, labels):
-        labels_mat = labels.unsqueeze(0).repeat(labels.shape[0], 1)
-        res = (labels_mat == labels_mat.T).int().to(self.device)
-        return res
-
-    def _get_anchor_negative_triplet_mask(self, labels):
-        labels_mat = labels.unsqueeze(0).repeat(labels.shape[0], 1)
-        res = (labels_mat != labels_mat.T).int().to(self.device)
-        return res
-
-    def _get_dist_matrix(self, embeddings):
-        return torch.cdist(embeddings, embeddings).to(self.device)
-
-    def __call__(self, embeddings, labels):
-        """Build the triplet loss over a batch of embeddings.
-
-        For each anchor, we get the hardest positive and hardest negative to form a triplet.
-
-        Args:
-            labels: labels of the batch, of size (batch_size,)
-            embeddings: tensor of shape (batch_size, embed_dim)
-
-        Returns:
-            triplet_loss: scalar tensor containing the triplet loss
-        """
-        # Get the pairwise distance matrix
-        pairwise_dist = self._get_dist_matrix(embeddings)
-
-        # For each anchor, get the hardest positive
-        # First, we need to get a mask for every valid positive (they should have same label)
-        mask_anchor_positive = self._get_anchor_positive_triplet_mask(labels)
-
-        # We put to 0 any element where (a, p) is not valid (valid if a != p and label(a) == label(p))
-        anchor_positive_dist = mask_anchor_positive * pairwise_dist
-
-        # shape (batch_size, 1)
-        hardest_positive_dist, _ = torch.max(
-            anchor_positive_dist, axis=1, keepdims=True)
-
-        # For each anchor, get the hardest negative
-        # First, we need to get a mask for every valid negative (they should have different labels)
-        mask_anchor_negative = self._get_anchor_negative_triplet_mask(labels)
-
-        # We add the maximum value in each row to the invalid negatives (label(a) == label(n))
-        max_anchor_negative_dist, _ = torch.max(
-            pairwise_dist, axis=1, keepdims=True)
-        anchor_negative_dist = pairwise_dist + \
-            max_anchor_negative_dist * (1.0 - mask_anchor_negative)
-
-        # shape (batch_size,)
-        hardest_negative_dist, _ = torch.min(
-            anchor_negative_dist, axis=1, keepdims=True)
-
-        # Combine biggest d(a, p) and smallest d(a, n) into final triplet loss
-        triplet_loss = torch.max(hardest_positive_dist -
-                                 hardest_negative_dist + self.margin, torch.zeros_like(hardest_negative_dist))
-
-        # Get final mean triplet loss
-        triplet_loss = torch.mean(triplet_loss)
-
-        return triplet_loss
 
 # %% [markdown]
-## Datasets
+# Datasets
 
 # The following 3 classes are used to handle the dataset that we have.
 # %%
@@ -361,14 +296,14 @@ def preprocess(df):
     )
 
 
-class TrainDataset(torch.utils.data.Dataset):
+class Dataset(torch.utils.data.Dataset):
     """
     This class is used to handle the train dataset to work witht the Triplet Loss.
     The __getitem__ method (to be used with a dataloader) returns the anchor, a random postive and a random negative for that anchor
     as well as the anchor's label.
     """
 
-    def __init__(self, data, labels, input_length=500):
+    def __init__(self, data, labels, input_length):
         self.data, self.labels = data, labels
         self.index = [i for i in range(len(self.data))]
         self.length = input_length
@@ -377,98 +312,133 @@ class TrainDataset(torch.utils.data.Dataset):
         return len(self.data)
 
     def __getitem__(self, index):
-        max_length = self.data[index].shape[1]
-        # int(np.random.uniform(0, max_length - self.length+1))
-        start_pos_anchor = int(np.random.uniform(0, max_length - self.length+1))
-        X_anchor = self.data[index][:,
-                                    start_pos_anchor:start_pos_anchor+self.length]
+        X_anchor = self.data[index]
         anchor_wvlt = reference_transform(X_anchor)
         y_anchor = self.labels[index]
+
+        # create list of possible positive index samples
+        positive_list = [
+            i for i in self.index if self.labels[i] == y_anchor and i != index]
+        positive_index = np.random.choice(positive_list)
+
+        positive = self.data[positive_index]
+        # get the wavelet transform of that sample (the two channels are concatenated along the last dim)
+        positive_wvlt = reference_transform(positive)
+
+        # same here
+        negative_list = [
+            i for i in self.index if self.labels[i] != y_anchor]
+        negative_index = np.random.choice(negative_list)
+
+        negative = self.data[negative_index]
+        negative_wvlt = reference_transform(negative)
 
         # concatenate the data for the TCN and the haar wavelet transform
         # they will be split in the forward pass
         return torch.cat((X_anchor, anchor_wvlt), 1), \
+            torch.cat((positive, positive_wvlt), 1), \
+            torch.cat((negative, negative_wvlt), 1), \
             y_anchor
 
+    @torch.no_grad()
+    def get_classifier_data(self, model: nn.Module):
+        data = []
+        device = torch.device("cuda:0")
+        for i in self.index:
+            anchor = self[i][0].unsqueeze(0)
+            anchor = anchor.to(device)
+            embed = model(anchor)
 
-class TestDataset(torch.utils.data.Dataset):
-    """
-    Is to be used with Dataloader for testing only
-    """
+            data.append(embed.cpu().detach().numpy().squeeze())
 
-    def __init__(self, data, labels):
-        self.data = data
-        self.labels = labels
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, index):
-        x = self.data[index]
-        wvlt = reference_transform(x)
-        out = torch.cat((x, wvlt), 1)
-        return out, self.labels[index]
+        data = np.array(data)
+        return data, self.labels
 
 
 class FromFiles:
     """
     Used to load the data from the files and split between test and train sets
+    Also segments the 1000-length inputs as suggested in the original paper
     """
 
-    def __init__(self, input_dir, input_length):
-        self.input_dir = input_dir
+    def __init__(self, input_dir, input_length, seg_offset=40):
         self.input_length = input_length
+        self.seg_offset = seg_offset
 
-        self.data, self.labels = self.__load_dataset()
-        self.index = [i for i in range(len(self.data))]
+        self.raw_data, self.raw_labels = self._load_dataset(input_dir)
+        self.seg_data, self.seg_labels = self._segment(
+            input_length, seg_offset)
+        self.index = [i for i in range(len(self.seg_data))]
 
-    def __load_dataset(self):
+    def _load_dataset(self, input_dir):
         x = []
         y = []
-        for dir, _, files in os.walk(self.input_dir):
+        for dir, _, files in os.walk(input_dir):
             for file in files:
                 label = int(file.split("_")[1])-1
                 df = pd.read_csv(dir + "/" + file, index_col=0)
                 df = preprocess(df).to_numpy().transpose()
-                x.append(torch.from_numpy(df).float())
+                x.append(torch.from_numpy(df).float()+1e-8)
                 y.append(label)
         return x, y
 
-    def split_train_test(self):
+    def _segment(self, input_length, offset):
+        new_data, new_labels = [], []
+        for i in range(len(self.raw_data)):
+            cur_offset = 0
+            data = self.raw_data[i].clone()
+            label = self.raw_labels[i]
+            while cur_offset + input_length < 1000:
+                new_data.append(data[:, cur_offset:cur_offset+input_length])
+                new_labels.append(label)
+                cur_offset += offset
+
+        return new_data, new_labels
+
+    def split_train_test(self, ratio=0.8):
         x_test, y_test = [], []
+        x_train, y_train = [], []
+
         for label in range(5):
-            possible_list = [i for i in self.index if self.labels[i] == label]
-            choosen_index = np.random.choice(possible_list)
+            possible_list = [
+                i for i in self.index if self.seg_labels[i] == label]
+            number_to_select = int(len(possible_list)*ratio)
+            train_list = set(np.random.choice(
+                possible_list, number_to_select, replace=False))
+            test_list = set(possible_list)-train_list
 
-            positive = self.data[choosen_index]
-            max_length = positive.shape[1]
-            train, test = torch.split(
-                positive, [max_length-self.input_length, self.input_length], dim=1)
+            for i in train_list:
+                x_train.append(self.seg_data[i])
+            for i in test_list:
+                x_test.append(self.seg_data[i])
 
-            x_test.append(test)
-            y_test.append(label)
-            self.data[choosen_index] = train
+            y_train += [label] * len(train_list)
+            y_test += [label] * len(test_list)
 
-        return self.data, self.labels, x_test, y_test
+        return x_train, y_train, x_test, y_test
 
 # %% [markdown]
 
-## Custom Dataloader
+# Custom Dataloader
 
 # This custom dataset is useful to load bigger batches than the 19 sample sequences that we have.
 # %%
+
+
 class Dataloader():
     """Homemade dataloader for our needs in training
     This is different from the other one as it allows for "infinite" batches, even when the data only has 
     19 points. When setting bacht_size*number_batches bigger that the total number of points in the dataset,
     this dataloader will just loop again from the beginning."""
 
-    def __init__(self, dataset: TrainDataset, batch_size: int, number_batch: int, shuffle=True):
+    def __init__(self, dataset: Dataset, batch_size: int, shuffle=True, number_batch=None):
         self.dataset = dataset
         self.b_size = batch_size
         self.n_batches = number_batch
         self.current_batch = 0
         self.shuffle = shuffle
+        if number_batch == None:
+            self.n_batches = len(self.dataset)//batch_size
 
     def __iter__(self):
         self.current_batch = 0
@@ -482,30 +452,35 @@ class Dataloader():
     def __next__(self):
         dataset_length = len(self.dataset)
         if self.current_batch < dataset_length:
-            a_out, l_out = [], []
+            a_out, p_out, n_out, l_out = [], [], [], []
             for _ in range(self.b_size):
                 self.i = (self.i+1) % dataset_length
-                a, l = self.dataset[self.index_list[self.i]]
+                a, p, n, l = self.dataset[self.index_list[self.i]]
                 a_out.append(a)
-                l_out.append(l)
+                p_out.append(p)
+                n_out.append(n)
+                l_out.append(torch.Tensor([l]))
             self.current_batch += 1
             a_out = torch.stack(a_out)
-            l_out = torch.Tensor(l_out)
-            return a_out, l_out
+            p_out = torch.stack(p_out)
+            n_out = torch.stack(n_out)
+            l_out = torch.stack(l_out)
+            return a_out, p_out, n_out, l_out
 
         else:
             self.current_batch = 0
             raise StopIteration
 
-#%% [markdown]
-## The model
+# %% [markdown]
+# The model
 
-#The following code is the Driver2Vec model setup.
+# The following code is the Driver2Vec model setup.
+
 
 # %%
 input_channels = 31
 input_length = 300
-channel_sizes = [25,25]
+channel_sizes = [25, 25]
 output_size = 62
 kernel_size = 16
 dropout = 0.1
@@ -513,57 +488,68 @@ model = Driver2Vec(input_channels, input_length, channel_sizes, output_size,
                    kernel_size=kernel_size, dropout=dropout, do_wavelet=False)
 model.to(device)
 
-#%% [markdown]
+# %% [markdown]
 
-#Next are the dataloader, loss and optimizer.
+# Next are the dataloader, loss and optimizer.
 
 # %%
 
-# # datasets parameters
-# params = {'batch_size': 4,
-#           'shuffle': True,
-#           'num_workers': 1}
+# datasets parameters
+params = {'batch_size': 4,
+          'shuffle': True,
+          'num_workers': 1}
 
 
 fromfiles = FromFiles("./dataset", input_length)
 x_train, y_train, x_test, y_text = fromfiles.split_train_test()
-training_set = TrainDataset(x_train, y_train, input_length)
-training_generator = Dataloader(training_set, 20, 4)
+training_set = Dataset(x_train, y_train, input_length)
+training_generator = DataLoader(training_set, **params)
 
-loss = HardTripletLoss(device, margin=0.5)
-optimizer = torch.optim.Adam(model.parameters(), lr=0.004, weight_decay=0.0001)
+loss = nn.TripletMarginLoss(margin=1)
+optimizer = torch.optim.Adam(
+    model.parameters(), lr=0.00004, weight_decay=0.001)
 
-#%% [markdown]
+# %% [markdown]
 
 # Finally, here is the training loop.
 # %%
-epochs = 50
+epochs = 200
 
 
 model.train()
 for epoch in (pbar := tqdm(range(epochs))):
     loss_list = []
-    for anchor, label in training_generator:
+    dap_list = []
+    dan_list = []
+    for anchor, positive, negative, label in training_generator:
         anchor = anchor.to(device)
+        positive = positive.to(device)
+        negative = negative.to(device)
 
         optimizer.zero_grad()
 
+        y_positive = model(positive)
+        y_negative = model(negative)
+
         y_anchor = model(anchor)
 
-        loss_value = loss(y_anchor, label)
+        loss_value = loss(y_anchor, y_positive, y_negative)
+        loss_int = float(loss_value) == nan
+        dap_list.append((y_anchor-y_positive).norm(2).cpu().detach().numpy())
+        dan_list.append((y_anchor-y_negative).norm(2).cpu().detach().numpy())
         loss_value.backward()
 
         optimizer.step()
 
         loss_list.append(loss_value.cpu().detach().numpy())
     #print("Epoch: {}/{} - Loss: {:.4f}".format(epoch+1, epochs, np.mean(loss_list)))
-    pbar.set_description("Loss: %0.5g, Epochs" % (np.mean(loss_list)))
-
+    pbar.set_description("Loss: %0.5g/%0.3g, Dap: %0.3g, Dan: %0.3g, Epochs" % (
+        np.mean(loss_list), loss_int, np.mean(dap_list), np.mean(dan_list)))
 # %% [markdown]
 
-## LightGBM classifier
+# LightGBM classifier
 
-#The following is the setup and the training of the LightGBM classifier.
+# The following is the setup and the training of the LightGBM classifier.
 # %%
 
 params1 = {'batch_size': 19,
@@ -574,23 +560,10 @@ params2 = {'batch_size': 38,
            'shuffle': False,
            'number_batch': 1}
 
-classifier_train_set = TrainDataset(x_test, y_text, input_length)
-classifier_train_generator = DataLoader(training_set, **params1)
+classifier_train_set = Dataset(x_train, y_train, input_length)
 
-x_train_classifier = []
-y_train_classifier = []
-model.train(False)
-for data, label in classifier_train_generator:
-    data = data.to(device)
-    embed = model(data)
-
-
-for i in range(5):
-    x_train_classifier.append(embed[i, :].cpu().detach().numpy().squeeze())
-    y_train_classifier.append(int(label[i]))
-
-x_train_classifier = np.array(x_train_classifier)
-y_train_classifier = np.array(y_train_classifier)
+x_train_classifier, y_train_classifier = classifier_train_set.get_classifier_data(
+    model)
 
 lgb_train = lgbm.Dataset(x_train_classifier, y_train_classifier)
 
@@ -614,23 +587,11 @@ clf = lgbm.train(params, lgb_train)
 
 # Testing the classifier on the test set we made and also a part of the training set to evaluate it.
 # %%
-params = {'batch_size': 5,
-          'shuffle': False,
-          'num_workers': 1}
 
-classifier_test_set = TestDataset(x_test, y_text)
-classifier_test_generator = DataLoader(classifier_test_set, **params)
+classifier_test_set = Dataset(x_test, y_text, input_length)
 
-x_test_classifier = []
-y_test_classifier = []
-for data, label in classifier_test_generator:
-    data = data.to(device)
-    embed = model(data)
-
-
-for i in range(5):
-    x_test_classifier.append(embed[i, :].cpu().detach().numpy().squeeze())
-    y_test_classifier.append(int(label[i]))
+x_test_classifier, y_test_classifier = classifier_test_set.get_classifier_data(
+    model)
 
 
 y_pred = clf.predict(x_test_classifier)
@@ -648,43 +609,20 @@ def distance_matrix(tensor: torch.Tensor):
     return res
 
 
-# %%
-params = {"batch_size": 19,
-          "shuffle": False,
-          "num_workers": 1}
+# %% [markdown]
 
-generator = DataLoader(training_set, **params)
-x_test_classifier = []
-y_test_classifier = []
-for data, label in generator:
-    data = data.to(device)
-    embed = model(data)
-
-
-for i in range(19):
-    x_test_classifier.append(embed[i, :].cpu().detach().numpy().squeeze())
-    y_test_classifier.append(int(label[i]))
-
-
-y_pred = clf.predict(x_test_classifier)
-print(y_pred, y_test_classifier)
-
-#%% [markdown]
-
-## T-SNE visualisation
+# T-SNE visualisation
 
 # As in the original paper, we us t-SNE to visualise the embeddings. It can help to spot the issues in the model.
-
 # %%
-
 params = {'batch_size': 60,
-          'shuffle': False,
+          'shuffle': True,
           'number_batch': 1}
 
 generator = Dataloader(training_set, **params)
 x_tsne = []
 y_tsne = []
-for data, label in generator:
+for data, _, _, label in generator:
     data = data.to(device)
     embed = model(data)
 
