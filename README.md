@@ -7,7 +7,7 @@ Authors: Danish Khan, Achille Bailly and Mingjia He
 Original paper[1]: Yang, J., Zhao, R., Zhu, M., Hallac, D., Sodnik, J., & Leskovec, J. (2021). Driver2vec: Driver identification from automotive data. arXiv preprint arXiv:2102.05234.
 
 ## Introduction
-The neural network architecture Driver2Vec is discussed and used to detect drivers from automotive data in this blogplot. Yang et al. published a paper in 2021 that explained and evaluated Driver2Vec, which outperformed other architectures at that time. Driver2Vec (is the first architecture that) blends temporal convolution with triplet loss using time series data [1]. With this embedding, it is possible to classify different driving styles. The purpose of this blog post is to give a full explanation of this architecture as well as to develop it from the ground up.
+
 
 ## Method
 
@@ -85,6 +85,47 @@ Where ![](https://latex.codecogs.com/svg.image?x_{r,p,n}) are the embeddings for
 With the available dataset being so limited, choosing the positive and negative samples for each anchor at random is probably enough. In most cases however, the most efficient way of choosing them is to pick the worst ones for each anchor (see [4]), i.e. chossing the positive sample that is the farthest away and the negative one that is the closest. Again, for more detail on how to actually do that efficiently, go to the website referenced in [4] for a very detailed explanation.
 
 ### Gradient Boosting Decision Trees (LightGBM)
+Before introducing Light GBM, we first illustrate what is boosting and how it can work. The goal of boosting is improving the prediction power converting weak learners into strong learners. The basic logit is to build a model on the training dataset, and then build the next model to rectify the errors present in the previous one. In this procedure, weights of observations are updates according to the rule that wrongly classified observations would have increasing weights. So, only those misclassified observations get selected in the next model and the procedure iterate until the errors are minimized. 
+
+Gradient Boosting trains many models in an additive and sequential manner, using gradient decent to minimize the loss function One of the most popular types of gradient boosting is boosted decision trees. There are two different strategies to compute the trees: level-wise and leaf-wise, as shown in the following figure. The level-wise strategy grows the tree level by level. In this strategy, each node splits the data prioritizing the nodes closer to the tree root. The leaf-wise strategy grows the tree by splitting the data at the nodes with the highest loss change. 
+
+
+<div align=center><img width="520" height="160" alt="" src="https://user-images.githubusercontent.com/101323945/163355753-4eda483e-61ea-4634-aacf-e4f736e58a45.png"/></div>
+<p align="center">Figure 5 The level-wise strategy[5]</p>
+
+<div align=center><img width="520" height="160" alt="" src="https://user-images.githubusercontent.com/101323945/163355769-b5cb412b-249e-43ef-9729-180b50527689.png"/></div>
+<p align="center">Figure 6 The leaf-wise strategy[5]</p>
+
+
+However, conventional gradient decision tree could be inefficient when dealing with large scale data set. That is why Light GBM is proposed, which is a gradient boosting decision tree with Gradient-based One-Side Sampling (GOSS) and Exclusive Feature Bundling (EFB). 
+Light GBM is based on tree-based learning algorithms growing tree vertically (leaf-wise).  It is designed to be  distributed and efficient with the following advantages[6]:
+
+•	Faster training speed and higher efficiency.
+
+•	Lower memory usage.
+
+•	Better accuracy.
+
+•	Support of parallel, distributed, and GPU learning.
+
+•	Capable of handling large-scale data.
+
+
+GOSS is design for the sampling process with the aim to reduce computation cost and not lose much training accuracy. The instances with large gradients would be better kept considering those bearing more information gain, and the instances with small gradients will be randomly drop. EFB tries to effectively reduce the number of features in a nearly lossless manner. A feature scanning algorithm is designed to build feature histograms from the feature bundles. The algorithms used in presented in the following figures (refer to the work of Ke. G et al.[7]).
+
+
+
+
+<div align=center><img width="440" height="250" alt="" src="https://user-images.githubusercontent.com/101323945/163355909-37c69ea4-0575-4709-94b9-7012e2874b38.png"/>
+</div>
+<div align=center><img width="440" height="250" alt="" src="https://user-images.githubusercontent.com/101323945/163355924-f46f4075-726f-4311-bf30-49ab9dd5f620.png"/>
+ </div>
+<p align="center">Figure 7 Algorithms for Light GBM[7]</p>
+
+  
+Light GBM has been widely used due to its ability to handle the large size of data and takes lower memory to run. But it should be noted that there are shortcomings: Light GBM is sensitive to overfitting and can easily overfit small data. 
+
+
 
 ## Data
 ## Results
@@ -97,4 +138,3 @@ With the available dataset being so limited, choosing the positive and negative 
 
 [4]: Good explanation and implementation (in Tensorflow) of the Triplet Loss: https://omoindrot.github.io/triplet-loss
 
-[5]: Haar Wavelets http://dsp-book.narod.ru/PWSA/8276_01.pdf
