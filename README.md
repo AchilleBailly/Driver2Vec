@@ -80,7 +80,9 @@ Once the output of the wavelet transform and the TCN are combined throught a Ful
   
 </div>
 
-Where ![](https://latex.codecogs.com/svg.image?x_{r,p,n}) are the embeddings for the anchor, positive and negative samples respectively, ![](https://latex.codecogs.com/svg.image?D_{rp}) (resp. ![](https://latex.codecogs.com/svg.image?D_{rn}))the distance (usually euclidian) between the anchor and the positive embdeggings (resp. negative).
+Where ![](https://latex.codecogs.com/svg.image?x_{r,p,n}) are the embeddings for the anchor, positive and negative samples respectively, ![](https://latex.codecogs.com/svg.image?D_{rp}) (resp. ![](https://latex.codecogs.com/svg.image?D_{rn})) is the distance (usually euclidian) between the anchor and the positive embdeggings (resp. negative) and the margin is a positive number.
+
+With the available dataset being so limited, choosing the positive and negative samples for each anchor at random is probably enough. In most cases however, the most efficient way of choosing them is to pick the worst ones for each anchor (see [here]([^tripletloss_website])), i.e. chossing the positive sample that is the farthest away and the negative one that is the closest. Again, for more detail on how to actually do that efficiently, go to [this website]([^tripletloss_website]) for a very detailed explanation.
 
 ### Gradient Boosting Decision Trees (LightGBM)
 
