@@ -243,6 +243,7 @@ After reconstructing the Driver2Vec architecture, we let this model train on the
 | `Turn indicators`            | 79.3                           | 0.00                  |
 | `All Sensor Groups included` | 81.8                           | 0.00                  |
 
+As you can probably see in the code architecture or the accuracy that we get, we had quite some issues with having the network to run properly. The main one was that we noticed the loss plateauing at the margin value or so when it is supposed to converge to 0. While in hinsight it may not have been an issue, we spent a lot of time on trying to firgure things out, experimenting on a lot of different plausible causes (our architecture, the data, NaN apparitions, weight decay etc). Hence the architecture is still in its experimental form and the accuracy so low. 
 
 # Reference
 <a id="1">[1]</a>  Yang, J., Zhao, R., Zhu, M., Hallac, D., Sodnik, J., & Leskovec, J. (2021). Driver2vec: Driver identification from automotive data. arXiv preprint arXiv:2102.05234.
