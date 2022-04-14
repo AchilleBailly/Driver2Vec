@@ -95,6 +95,8 @@ $$ D_{rp}^{2} + \alpha < D_{rp}^{2} $$
 
 With the available dataset being so limited, choosing the positive and negative samples for each anchor at random is probably enough. In most cases however, the most efficient way of choosing them is to pick the worst ones for each anchor (see [[5]](#5)), i.e. choosing the positive sample that is the farthest away and the negative one that is the closest. Again, for more detail on how to actually do that efficiently, go to the website referenced in [[5]](#5) for a very detailed explanation.
 
+In the end, we chose to implement the "hard" triplet loss as we thought it might resolve the issues we faced.
+
 
 ## Gradient Boosting Decision Trees (LightGBM)
 Before introducing Light GBM, we first illustrate what is boosting and how it can work. The goal of boosting is improving the prediction power converting weak learners into strong learners. The basic logit is to build a model on the training dataset, and then build the next model to rectify the errors present in the previous one. In this procedure, weights of observations are updates according to the rule that wrongly classified observations would have increasing weights. So, only those misclassified observations get selected in the next model and the procedure iterate until the errors are minimized.
@@ -241,9 +243,12 @@ After reconstructing the Driver2Vec architecture, we let this model train on the
 | `Acceleration`               | 79.1                           | 0.00                  |
 | `Steering wheel/road angle`  | 79.2                           | 0.00                  |
 | `Turn indicators`            | 79.3                           | 0.00                  |
-| `All Sensor Groups included` | 81.8                           | 0.00                  |
+| `All Sensor Groups included` | 81.8                           | 60.0                  |
 
-As you can probably see in the code architecture or the accuracy that we get, we had quite some issues with having the network to run properly. The main one was that we noticed the loss plateauing at the margin value or so when it is supposed to converge to 0. While in hinsight it may not have been an issue, we spent a lot of time on trying to firgure things out, experimenting on a lot of different plausible causes (our architecture, the data, NaN apparitions, weight decay etc). Hence the architecture is still in its experimental form and the accuracy so low. 
+
+Based on the results found in Table \ref{fig:ablation}, and with the limited data at hand, the reproduced architecture shows signs of identifying different driving styles. However, all reproduced results are lower compared to the original accuracies.
+
+Aside from the lack of data, the decrease in accuracy could be caused by the Triplet Margin Loss function. Throughout the experiments, we saw that the loss kept converging to the margin, rather than decreasing to zero. From this, we interpret that it is much more difficult to find an embedding that satisfies the inequality described by equation \eqref{eq:ineq}. This might be due to the way the architecture was implemented.
 
 # Reference
 <a id="1">[1]</a>  Yang, J., Zhao, R., Zhu, M., Hallac, D., Sodnik, J., & Leskovec, J. (2021). Driver2vec: Driver identification from automotive data. arXiv preprint arXiv:2102.05234.
