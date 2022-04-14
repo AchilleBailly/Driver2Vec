@@ -76,6 +76,17 @@ $$ d_m = \frac{f_{2m-1} - f_{2m+1}}{\sqrt{2}}$$
 Figure 4. An example for Haar transform [[4]](#4)
 </center>
 
+### Triplet Margin Loss
+
+Once the output of the wavelet transform and the TCN are combined throught a Fully Connected layer to form the embedding, we need a way to train the network. With no ground truth to compare the output to, the *triplet margin loss* is used. At its core, this criterion pulls together the embeddings that are supposed to be close and pushes away the ones that are not. Mathematically, it is defined as follows:
+
+$$ \bold{L}(x_{r},x_{p},x_{n})=max(0,D_{rp}^{2} + D_{rp}^{2} + \alpha) $$
+
+Where $x_{r,p,n}$ are the embeddings for the anchor, positive and negative samples respectively, $D_{rp}$ (resp. $D_{rn}$) is the distance (usually euclidian) between the anchor and the positive embdeggings (resp. negative) and $\alpha$ is a positive number called the margin.
+
+With the available dataset being so limited, choosing the positive and negative samples for each anchor at random is probably enough. In most cases however, the most efficient way of choosing them is to pick the worst ones for each anchor (see [[5]](#5)), i.e. chossing the positive sample that is the farthest away and the negative one that is the closest. Again, for more detail on how to actually do that efficiently, go to the website referenced in [[5]](#5) for a very detailed explanation.
+
+
 ## Gradient Boosting Decision Trees (LightGBM)
 
 # Data
@@ -172,3 +183,5 @@ The columns remain identical. Although both the original and sampled datasets in
 <a id="3">[3]</a> Bai, S., Kolter, J. Z., & Koltun, V. (2018). An empirical evaluation of generic convolutional and recurrent networks for sequence modeling. arXiv preprint arXiv:1803.01271.
 
 <a id="4">[4]</a> Haar Wavelets http://dsp-book.narod.ru/PWSA/8276_01.pdf
+
+<a id="5">[5]</a> Good explanation and implementation (in Tensorflow) of the Triplet Loss: https://omoindrot.github.io/triplet-loss

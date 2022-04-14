@@ -70,15 +70,31 @@ Most specifically, the Haar transform decomposes a discrete signal into two sub-
 
 <p align="center">Figure 4 An exampel for Haar transform[4]</p>
 
+### Triplet Margin Loss
+
+Once the output of the wavelet transform and the TCN are combined throught a Fully Connected layer to form the embedding, we need a way to train the network. With no ground truth to compare the output to, the *triplet margin loss* is used. At its core, this criterion pulls together the embeddings that are supposed to be close and pushes away the ones that are not. Mathematically, it is defined as follows:
+
+<div align=center>
+
+  ![](https://latex.codecogs.com/svg.image?\bold{L}(x_{r},x_{p},x_{n})=max(0,D_{rp}^{2}&plus;D_{rp}^{2}&plus;margin))
+  
+</div>
+
+Where ![](https://latex.codecogs.com/svg.image?x_{r,p,n}) are the embeddings for the anchor, positive and negative samples respectively, ![](https://latex.codecogs.com/svg.image?D_{rp}) (resp. ![](https://latex.codecogs.com/svg.image?D_{rn})) is the distance (usually euclidian) between the anchor and the positive embdeggings (resp. negative) and the margin is a positive number.
+
+With the available dataset being so limited, choosing the positive and negative samples for each anchor at random is probably enough. In most cases however, the most efficient way of choosing them is to pick the worst ones for each anchor (see [4]), i.e. chossing the positive sample that is the farthest away and the negative one that is the closest. Again, for more detail on how to actually do that efficiently, go to the website referenced in [4] for a very detailed explanation.
+
 ### Gradient Boosting Decision Trees (LightGBM)
 
 ## Data
 ## Results
-## Reference
-[1] Yang, J., Zhao, R., Zhu, M., Hallac, D., Sodnik, J., & Leskovec, J. (2021). Driver2vec: Driver identification from automotive data. arXiv preprint arXiv:2102.05234.
+## References
+[1]: Yang, J., Zhao, R., Zhu, M., Hallac, D., Sodnik, J., & Leskovec, J. (2021). Driver2vec: Driver identification from automotive data. arXiv preprint arXiv:2102.05234.
 
-[2] Francesco, L. (2021). Temporal Convolutional Networks and Forecasting. https://unit8.com/resources/temporal-convolutional-networks-and-forecasting/
+[2]: Francesco, L. (2021). Temporal Convolutional Networks and Forecasting. https://unit8.com/resources/temporal-convolutional-networks-and-forecasting/
 
-[3] Bai, S., Kolter, J. Z., & Koltun, V. (2018). An empirical evaluation of generic convolutional and recurrent networks for sequence modeling. arXiv preprint arXiv:1803.01271.
+[3]: Bai, S., Kolter, J. Z., & Koltun, V. (2018). An empirical evaluation of generic convolutional and recurrent networks for sequence modeling. arXiv preprint arXiv:1803.01271.
 
-[4] Haar Wavelets http://dsp-book.narod.ru/PWSA/8276_01.pdf
+[4]: Good explanation and implementation (in Tensorflow) of the Triplet Loss: https://omoindrot.github.io/triplet-loss
+
+[5]: Haar Wavelets http://dsp-book.narod.ru/PWSA/8276_01.pdf
