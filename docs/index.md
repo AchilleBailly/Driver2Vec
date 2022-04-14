@@ -85,9 +85,9 @@ The two vectors that the wavelet transform outputs are then fed through a Fully 
 
 Once we the embedding from the full architecture, we need a way to train the network. With no ground truth to compare the output to, the *triplet margin loss* is used. At its core, this criterion pulls together the embeddings that are supposed to be close and pushes away the ones that are not. Mathematically, it is defined as follows:
 
-$$ \textbf{L}(x_{r},x_{p},x_{n})=max(0,D_{rp}^{2} + D_{rp}^{2} + \alpha) $$
+$$ \mathbf{L}(x_{r},x_{p},x_{n})=\max(0,D_{rp}^{2} - D_{rn}^{2} + \alpha) $$
 
-Where $x_{r,p,n}$ are the embeddings for the anchor, positive and negative samples respectively, $D_{rp}$ (resp. $D_{rn}$) is the distance (usually euclidian) between the anchor and the positive embdeggings (resp. negative) and $\alpha$ is a positive number called the margin (often set to $1.0$).
+Where $x_r, x_p, x_n$ are the embeddings for the anchor, positive and negative samples respectively, $D_{rp}$ (resp. $D_{rn}$) is the distance (usually euclidian) between the anchor and the positive embdeggings (resp. negative) and $\alpha$ is a positive number called the margin (often set to $1.0$).
 
 Essentially, it is trying to make sure that the following inequation is respected:
 
@@ -105,18 +105,18 @@ Gradient Boosting trains many models in an additive and sequential manner, using
 <div style="text-align:center"><img width="550" src="https://user-images.githubusercontent.com/101323945/163355753-4eda483e-61ea-4634-aacf-e4f736e58a45.png" /></div>
 </a>
 <center>
-Figure 5. The level-wise strategy[5]
+Figure 5. The level-wise strategy [[6]](#6)
 </center>
 
 <a id="Figure 6">
 <div style="text-align:center"><img width="550" src="https://user-images.githubusercontent.com/101323945/163355769-b5cb412b-249e-43ef-9729-180b50527689.png" /></div>
 </a>
 <center>
-Figure 6 The leaf-wise strategy[5]
+Figure 6. The leaf-wise strategy [[6]](#6)
 </center>
 
 However, conventional gradient decision tree could be inefficient when dealing with large scale data set. That is why Light GBM is proposed, which is a gradient boosting decision tree with Gradient-based One-Side Sampling (GOSS) and Exclusive Feature Bundling (EFB). 
-Light GBM is based on tree-based learning algorithms growing tree vertically (leaf-wise).  It is designed to be  distributed and efficient with the following advantages[6]:
+Light GBM is based on tree-based learning algorithms growing tree vertically (leaf-wise).  It is designed to be  distributed and efficient with the following advantages [[7]](#7):
 
 •	Faster training speed and higher efficiency.
 
@@ -129,13 +129,15 @@ Light GBM is based on tree-based learning algorithms growing tree vertically (le
 •	Capable of handling large-scale data.
 
 
-GOSS is a design for the sampling process with the aim to reduce computation cost and not lose much training accuracy. The instances with large gradients would be better kept considering those bearing more information gain, and the instances with small gradients will be randomly drop. EFB tries to effectively reduce the number of features in a nearly lossless manner. A feature scanning algorithm is designed to build feature histograms from the feature bundles. The algorithms used in presented in the following figures (refer to the work of Ke. G et al.[7]).
+GOSS is a design for the sampling process with the aim to reduce computation cost and not lose much training accuracy. The instances with large gradients would be better kept considering those bearing more information gain, and the instances with small gradients will be randomly drop. EFB tries to effectively reduce the number of features in a nearly lossless manner. A feature scanning algorithm is designed to build feature histograms from the feature bundles. The algorithms used in presented in the following figures (refer to the work of Ke. G et al. [[8]](#8)).
 
 <div align=center><img width="550" height="300" alt="" src="https://user-images.githubusercontent.com/101323945/163355909-37c69ea4-0575-4709-94b9-7012e2874b38.png"/>
 </div>
 <div align=center><img width="550" height="300" alt="" src="https://user-images.githubusercontent.com/101323945/163355924-f46f4075-726f-4311-bf30-49ab9dd5f620.png"/>
  </div>
-<p align="center">Figure 7 Algorithms for Light GBM[7]</p>
+<center>
+Figure 7. Algorithms for Light GBM [[8]](#8)
+</center>
 
   
 Light GBM has been widely used due to its ability to handle the large size of data and takes lower memory to run. But it should be noted that there are shortcomings: Light GBM is sensitive to overfitting and can easily overfit small data. 
