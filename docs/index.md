@@ -232,20 +232,20 @@ After reconstructing the Driver2Vec architecture, we let this model train on the
 
 | Removed Sensor Group         | Original Pairwise Accuracy (%) | Pairwise Accuracy (%) |
 | ---------------------------- | ------------------------------ | --------------------- |
-| `Speed, acceleration only`   | 66.3                           | 0.00                  |
-| `Distance information`       | 74.6                           | 0.00                  |
-| `Lane information`           | 77.8                           | 0.00                  |
-| `Acceleration/break pedal`   | 78.1                           | 0.00                  |
-| `Speed`                      | 78.8                           | 0.00                  |
-| `Gear box`                   | 79.0                           | 0.00                  |
-| `Acceleration`               | 79.1                           | 0.00                  |
-| `Steering wheel/road angle`  | 79.2                           | 0.00                  |
-| `Turn indicators`            | 79.3                           | 0.00                  |
-| `All Sensor Groups included` | 81.8                           | 60.0                  |
+| `Speed, acceleration only`   | 66.3                           | 66.7                  |
+| `Distance information`       | 74.6                           | 65.7                  |
+| `Lane information`           | 77.8                           | 68.3                  |
+| `Acceleration/break pedal`   | 78.1                           | 69.5                  |
+| `Speed`                      | 78.8                           | 65.3                  |
+| `Gear box`                   | 79.0                           | 56.5                  |
+| `Acceleration`               | 79.1                           | 66.7                  |
+| `Steering wheel/road angle`  | 79.2                           | 69.7                  |
+| `Turn indicators`            | 79.3                           | 64.7                  |
+| `All Sensor Groups included` | 81.8                           | 71.5                  |
 
 Based on the results found in Table \ref{fig:ablation}, and with the limited data at hand, the reproduced architecture shows signs of identifying different driving styles. However, all reproduced results are lower compared to the original accuracies.
 
-Aside from the lack of data, the decrease in accuracy could be caused by the Triplet Margin Loss function. Throughout the experiments, we saw that the loss kept converging to the margin, rather than decreasing to zero. From this, we interpret that it is much more difficult to find an embedding that satisfies the inequality described by equation \eqref{eq:ineq}. This might be due to the way the architecture was implemented.
+Aside from the lack of data, the decrease in accuracy could be caused by the Triplet Margin Loss function. Throughout the experiments, we saw that the loss kept converging to the margin, rather than decreasing to zero. From this, we interpret that it is much more difficult to find an embedding that satisfies the inequality $D_{rp}^{2} + \alpha < D_{rp}^{2}$. This might be due to the way the architecture was implemented.
 
 # Reference
 <a id="1">[1]</a>  Yang, J., Zhao, R., Zhu, M., Hallac, D., Sodnik, J., & Leskovec, J. (2021). Driver2vec: Driver identification from automotive data. arXiv preprint arXiv:2102.05234.
