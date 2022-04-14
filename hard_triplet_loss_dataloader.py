@@ -1,4 +1,5 @@
 # %%
+from operator import index
 import matplotlib.pyplot as plt
 from tsne_torch import TorchTSNE as TSNE
 import lightgbm as lgbm
@@ -626,7 +627,12 @@ def get_n_way_accuracy(n_way, test_dataset, train_dataset, model):
         clf = lgbm.train(params, lgb_train)
 
         pred = clf.predict(x_test_class)
-        
+
+        binar_pred = [0 if pred[index][truth] <
+                      0.5 else 1 for index, truth in enumerate(y_test_class)]
+        accuracies.append(np.mean(binar_pred))
+    
+    return np.mean(accuracies)
 
 
 test_dataset = Dataset(x_test, y_text, input_length)
@@ -636,17 +642,6 @@ get_n_way_accuracy(2, test_dataset, train_dataset, model)
 # %% [markdown]
 
 # Testing the classifier on the test set we made and also a part of the training set to evaluate it.
-# %%
-
-
-classifier_test_set = Dataset(x_test, y_text, input_length)
-
-x_test_classifier, y_test_classifier = classifier_test_set.get_classifier_data(
-    model)
-
-
-y_pred = clf.predict(x_test_classifier)
-print(y_pred, y_test_classifier)
 
 # %%
 
