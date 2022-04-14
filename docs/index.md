@@ -228,6 +228,22 @@ The columns remain identical. Although both the original and sampled datasets in
 
 
 # Results
+After reconstructing the Driver2Vec architecture, we let this model train on the sampled data. The performance is assessed by looking at the pairwise accuracy. This means that we are now in a binary classification setting, where the model does a prediction on every possible pair among all five drivers. The average accuracy is then reported. Moreover, the (average) pairwise accuracy is computed after having each sensor group removed from the data. This way the ablation study on Driver2Vec (Table 5 from original paper) is redone.
+
+| Removed Sensor Group         | Original Pairwise Accuracy (%) | Pairwise Accuracy (%) |
+| ---------------------------- | ------------------------------ | --------------------- |
+| `Speed, acceleration only`   | 66.3                           | 0.00                  |
+| `Distance information`       | 74.6                           | 0.00                  |
+| `Lane information`           | 77.8                          | 0.00                  |
+| `Acceleration/break pedal`   | 78.1                           | 0.00                  |
+| `Speed`                      | 78.8                           | 0.00                  |
+| `Gear box`                   | 79.0                           | 0.00                  |
+| `Acceleration`               | 79.1                           | 0.00                  |
+| `Steering wheel/road angle`  | 79.2                           | 0.00                  |
+| `Turn indicators`            | 79.3                           | 0.00                  |
+| `All Sensor Groups included` | 81.8                           | 0.00                  |
+
+
 # Reference
 <a id="1">[1]</a>  Yang, J., Zhao, R., Zhu, M., Hallac, D., Sodnik, J., & Leskovec, J. (2021). Driver2vec: Driver identification from automotive data. arXiv preprint arXiv:2102.05234.
 
