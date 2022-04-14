@@ -234,7 +234,7 @@ After reconstructing the Driver2Vec architecture, we let this model train on the
 | ---------------------------- | ------------------------------ | --------------------- |
 | `Speed, acceleration only`   | 66.3                           | 0.00                  |
 | `Distance information`       | 74.6                           | 0.00                  |
-| `Lane information`           | 77.8                          | 0.00                  |
+| `Lane information`           | 77.8                           | 0.00                  |
 | `Acceleration/break pedal`   | 78.1                           | 0.00                  |
 | `Speed`                      | 78.8                           | 0.00                  |
 | `Gear box`                   | 79.0                           | 0.00                  |
