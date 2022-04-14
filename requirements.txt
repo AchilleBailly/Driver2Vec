@@ -1,6 +1,7 @@
 numpy
 pandas
 torch
+tsne-torch
 PyWavelets
 tqdm
 ipywidgets
@@ -10,3 +11,4 @@ jupyterlab
 
 mkdocs
 mkdocs-windmill
+pandoc
